@@ -1,0 +1,73 @@
+name: Netlify
+
+# Publishes the web app to Netlify: production from main, a preview for each pull request.
+# Repository settings needed:
+#   secrets   NETLIFY_AUTH_TOKEN  (Netlify → User settings → Applications → Personal access tokens)
+#             NETLIFY_SITE_ID     (Netlify → Site configuration → Site details → Site ID)
+#   variables MARKETTE_API_ORIGIN (the Markette server the site proxies to; default https://api.markette.org)
+# Custom domain (app.markette.org) is set on the Netlify site: Domain management → Add a domain.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: netlify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Forks get no secrets, so they cannot deploy previews.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'netlify-preview' || 'netlify-production' }}
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Netlify proxy and headers
+        env:
+          MARKETTE_API_ORIGIN: ${{ vars.MARKETTE_API_ORIGIN || 'https://api.markette.org' }}
+        run: node scripts/netlify-files.mjs dist/frontend/browser
+      - name: Deploy
+        id: deploy
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          PROD: ${{ github.event_name != 'pull_request' }}
+          MESSAGE: ${{ github.event.pull_request.title || github.event.head_commit.message || 'Manual deploy' }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::warning::Netlify deploy skipped: set the NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID repository secrets."
+            exit 0
+          fi
+          args=(deploy --dir dist/frontend/browser --site "$NETLIFY_SITE_ID" --message "${MESSAGE:0:200}" --json)
+          if [ "$PROD" = "true" ]; then args+=(--prod); else args+=(--alias "pr-${{ github.event.number }}"); fi
+          npx --yes netlify-cli@27.10.0 "${args[@]}" > deploy.json
+          url=$(node -e "const d=require('./deploy.json'); console.log(d.url || d.deploy_url)")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed to $url" >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment the preview URL
+        if: github.event_name == 'pull_request' && steps.deploy.outputs.url != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `Netlify preview: ${{ steps.deploy.outputs.url }}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const mine = comments.find((c) => c.user.type === 'Bot' && c.body.startsWith('Netlify preview:'));
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
