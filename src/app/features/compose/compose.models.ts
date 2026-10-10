@@ -29,6 +29,8 @@ export interface ChannelState {
   targetStatus: TargetStatus | null;
   locked: boolean; // published / in flight: cannot be edited
   customized: boolean;
+  /** Reddit: effective post type and the URL a link post points to. */
+  reddit: { kind: 'self' | 'link' | 'image'; link: string } | null;
   /** Providers with a first comment: what goes in the post vs. the comment. */
   firstComment: (FirstCommentSplit & { count: number; max: number | null; channelDefault: boolean; override: boolean | undefined }) | null;
 }

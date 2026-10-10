@@ -445,6 +445,15 @@
                     <span class="hint">Comma-separated language codes</span>
                   </div>
                 </fieldset>
+              } @else if (s.channel.provider === 'reddit' && s.reddit) {
+                <app-reddit-options
+                  [channel]="s.channel"
+                  [options]="draft(s.channel.id).options"
+                  [kind]="s.reddit.kind"
+                  [link]="link().trim()"
+                  [disabled]="s.locked"
+                  (changed)="setOption(s.channel.id, $event.key, $event.value)"
+                />
               } @else if (s.channel.provider === 'telegram') {
                 <fieldset class="options" [disabled]="s.locked">
                   <legend>Telegram options</legend>
@@ -849,7 +858,18 @@
               }
             </div>
             @if (previewState(); as s) {
-              @if (s.isNewsletter || s.channel.provider === 'youtube' || s.channel.provider === 'discord') {
+              @if (s.channel.provider === 'reddit' && s.reddit) {
+                <app-reddit-preview
+                  [channel]="s.channel"
+                  [title]="s.title"
+                  [body]="s.firstComment ? s.firstComment.text : s.body"
+                  [kind]="s.reddit.kind"
+                  [link]="s.reddit.link"
+                  [media]="media()"
+                  [options]="draft(s.channel.id).options"
+                  [firstComment]="s.firstComment?.comment ?? ''"
+                />
+              } @else if (s.isNewsletter || s.channel.provider === 'youtube' || s.channel.provider === 'discord') {
                 <app-special-preview
                   [channel]="s.channel"
                   [body]="s.body"

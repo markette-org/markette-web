@@ -168,6 +168,7 @@ export class PostDetailPage {
       if (key === 'impressions') return 'Delivered emails';
       if (key === 'reach') return 'Opened';
     }
+    if (p === 'reddit' && key === 'likes') return 'Score';
     return key === 'impressions' ? 'Impressions' : key;
   }
 

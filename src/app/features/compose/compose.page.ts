@@ -48,6 +48,9 @@ import { measure, countCodepoints } from '../../shared/utils/text-count';
 import { splitFirstComment } from '../../shared/utils/first-comment';
 import { RelativeTimePipe } from '../../shared/pipes/tz-date.pipe';
 import { ComposePreviewComponent } from './compose-preview.component';
+import { RedditOptionsComponent } from './reddit-options.component';
+import { RedditPreviewComponent } from './reddit-preview.component';
+import { redditKind, redditLink, redditLinkComment, redditProblems } from './reddit';
 import { SpecialPreviewComponent } from './special-preview.component';
 import { ChannelDraft, ChannelState, LOCKED_STATES, ScheduleChoice } from './compose.models';
 
@@ -73,6 +76,8 @@ const EMPTY_DRAFT: ChannelDraft = { body: '', title: '', options: {} };
     ProviderIconComponent,
     StatusChipComponent,
     ComposePreviewComponent,
+    RedditOptionsComponent,
+    RedditPreviewComponent,
     SpecialPreviewComponent,
     RelativeTimePipe,
   ],
@@ -208,6 +213,19 @@ export class ComposePage implements OnInit {
             override,
           };
         }
+        let reddit: ChannelState['reddit'] = null;
+        if (channel.provider === 'reddit') {
+          const kind = redditKind(media, d.options, this.link().trim());
+          reddit = { kind, link: kind === 'link' ? redditLink(this.link().trim(), body) : '' };
+          if (kind === 'link') {
+            // Link posts have no body: the text becomes the author's first comment (backend prepare_first_comment).
+            const base = firstComment ?? { text: body, link: this.link().trim(), comment: '', moved: false, count: 0, max: null, channelDefault: false, override: undefined };
+            const moved = redditLinkComment(base.text, base.link || this.link().trim(), base.comment);
+            reddit.link = moved.link;
+            firstComment = { ...base, text: '', link: moved.link, comment: moved.comment, count: measure(moved.comment, 'chars') };
+            postedText = '';
+          }
+        }
         const count = measure(postedText, provider?.count_mode ?? 'chars');
         const max = provider?.max_chars ?? null;
         const problems: string[] = [];
@@ -222,7 +240,10 @@ export class ComposePage implements OnInit {
           problems.push(`${provider.label} does not support video here.`);
         if (needsTitle && !title.trim())
           problems.push(forumThread && !isBlog && !provider?.supports_title ? 'Forum threads need a title.' : isNewsletter ? 'An email subject is required.' : 'A title is required.');
-        if (!body.trim() && !media.length) problems.push('Nothing to publish yet.');
+        if (!body.trim() && !media.length && !(reddit?.kind === 'link' && reddit.link)) problems.push('Nothing to publish yet.');
+        if (channel.provider === 'reddit') {
+          for (const p of redditProblems(channel, title, body, d.options, media, this.link().trim())) if (!problems.includes(p)) problems.push(p);
+        }
         // Network-specific rules mirrored from the backend providers.
         if (channel.provider === 'whatsapp') {
           if (media.length && !channel.config?.['template_has_image'])
@@ -267,6 +288,7 @@ export class ComposePage implements OnInit {
           locked: !!targetStatus && LOCKED_STATES.includes(targetStatus),
           customized: !!(d.body.trim() || d.title.trim()),
           firstComment,
+          reddit,
         };
       });
   });

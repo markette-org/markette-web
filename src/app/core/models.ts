@@ -153,6 +153,7 @@ export type ProviderKey =
   | 'wechat'
   | 'qq'
   | 'threads'
+  | 'reddit'
   | 'youtube'
   | 'discord'
   | 'ghost'
@@ -370,6 +371,13 @@ export interface TargetOptions {
   category_id?: string;
   // discord
   forum_thread?: boolean;
+  // reddit (image posts are automatic when media is attached)
+  post_type?: 'self' | 'link';
+  flair_id?: string;
+  flair_text?: string;
+  nsfw?: boolean;
+  spoiler?: boolean;
+  send_replies?: boolean;
   // ghost ('' = web only; absent = channel default)
   newsletter?: string;
   email_segment?: 'all' | 'status:free' | 'status:-free';
@@ -969,4 +977,33 @@ export interface SsoDiscovery {
 export interface SsoExchange extends AuthTokens {
   user: User;
   next: string;
+}
+
+/* --- Reddit ------------------------------------------------------------------------ */
+
+export interface RedditFlair {
+  id: string;
+  text: string;
+  /** The poster may edit the flair text. */
+  editable: boolean;
+}
+
+/** Subset of Reddit's post_requirements stored in channel.config.requirements. */
+export interface RedditRequirements {
+  is_flair_required?: boolean;
+  title_required_strings?: string[];
+  title_blacklisted_strings?: string[];
+  title_text_min_length?: number | null;
+  title_text_max_length?: number | null;
+  title_regexes?: string[];
+  body_restriction_policy?: 'required' | 'notAllowed' | 'none' | string;
+  body_text_min_length?: number | null;
+  body_text_max_length?: number | null;
+  body_required_strings?: string[];
+  body_blacklisted_strings?: string[];
+  link_restriction_policy?: 'whitelist' | 'blacklist' | 'none' | string;
+  domain_whitelist?: string[];
+  domain_blacklist?: string[];
+  guidelines_text?: string;
+  [key: string]: unknown;
 }

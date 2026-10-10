@@ -21,7 +21,7 @@ import { RelativeTimePipe, TzDatePipe } from '../../shared/pipes/tz-date.pipe';
 import { PlatformHeaderComponent } from './platform-header.component';
 import { copyText } from './platform-utils';
 
-type SectionKey = 'general' | 'announcement' | 'signups' | 'plan' | 'publishing' | 'ai' | 'x' | 'linkedin' | 'meta' | 'threads' | 'youtube' | 'mastodon' | 'billing';
+type SectionKey = 'general' | 'announcement' | 'signups' | 'plan' | 'publishing' | 'ai' | 'x' | 'linkedin' | 'meta' | 'threads' | 'reddit' | 'youtube' | 'mastodon' | 'billing';
 type LimitKey = 'default_max_workspaces' | 'default_max_channels' | 'default_max_members' | 'default_ai_monthly_tokens';
 
 interface OverrideField {
@@ -82,6 +82,15 @@ const SECTION_OVERRIDES: Partial<Record<SectionKey, OverrideField[]>> = {
     { name: 'META_GRAPH_VERSION', label: 'Graph API version', kind: 'text', hint: 'e.g. v21.0' },
   ],
   threads: [{ name: 'THREADS_APP_ID', label: 'Threads app ID', kind: 'text', hint: 'Meta App → Use cases → Access the Threads API → Threads app ID.' }],
+  reddit: [
+    { name: 'REDDIT_CLIENT_ID', label: 'Client ID', kind: 'text', hint: 'reddit.com/prefs/apps → your "web app" → the ID under its name.' },
+    {
+      name: 'REDDIT_USER_AGENT',
+      label: 'User-Agent',
+      kind: 'text',
+      hint: 'Reddit requires a descriptive one, e.g. "web:markette:1.0 (by /u/yourname)".',
+    },
+  ],
   youtube: [{ name: 'GOOGLE_CLIENT_ID', label: 'OAuth client ID', kind: 'text', hint: 'Google Cloud → APIs & Services → Credentials → OAuth client (Web application).' }],
   mastodon: [{ name: 'MASTODON_APP_NAME', label: 'App name', kind: 'text', hint: 'Shown on Mastodon servers as the posting application.' }],
 };
@@ -92,6 +101,7 @@ const SECTION_SECRETS: Partial<Record<SectionKey, { name: string; label: string 
   linkedin: [{ name: 'LINKEDIN_CLIENT_SECRET', label: 'Client secret' }],
   meta: [{ name: 'META_APP_SECRET', label: 'App secret' }],
   threads: [{ name: 'THREADS_APP_SECRET', label: 'Threads app secret' }],
+  reddit: [{ name: 'REDDIT_CLIENT_SECRET', label: 'Client secret' }],
   youtube: [{ name: 'GOOGLE_CLIENT_SECRET', label: 'OAuth client secret' }],
   billing: [
     { name: 'STRIPE_SECRET_KEY', label: 'Secret key' },
@@ -117,6 +127,13 @@ export const NETWORK_APPS: { key: SectionKey; provider: string; label: string; c
   { key: 'linkedin', provider: 'linkedin', label: 'LinkedIn', callback: 'linkedin' },
   { key: 'meta', provider: 'facebook', label: 'Meta (Facebook & Instagram)', callback: 'facebook', note: 'One redirect URI serves both Facebook and Instagram.' },
   { key: 'threads', provider: 'threads', label: 'Threads', callback: 'threads', note: 'Add this as a redirect callback URL in the Threads use case settings of your Meta app.' },
+  {
+    key: 'reddit',
+    provider: 'reddit',
+    label: 'Reddit',
+    callback: 'reddit',
+    note: 'Create a "web app" at reddit.com/prefs/apps with this redirect URI. New Reddit apps need approval under Reddit\'s Responsible Builder Policy before they can post.',
+  },
   {
     key: 'youtube',
     provider: 'youtube',
@@ -219,7 +236,7 @@ export class PlatformSettingsPage implements OnInit {
     out.announcement = this.announcement() !== (d.announcement || '') || this.level() !== d.announcement_level;
     out.signups = this.signupsOpen() !== d.signups_open || this.orgCreationOpen() !== d.org_creation_open || this.domains().join(', ') !== this.splitDomains(d.signup_domains).join(', ');
     out.plan = LIMITS.some(({ key }) => this.limitValue(key) !== d[key]);
-    for (const key of ['publishing', 'ai', 'x', 'linkedin', 'meta', 'threads', 'youtube', 'mastodon', 'billing'] as SectionKey[]) {
+    for (const key of ['publishing', 'ai', 'x', 'linkedin', 'meta', 'threads', 'reddit', 'youtube', 'mastodon', 'billing'] as SectionKey[]) {
       const fields = SECTION_OVERRIDES[key] ?? [];
       let changed = fields.some((f) => this.ovr()[f.name] !== overrideToDraft(d.overrides[f.name]?.value, f.kind));
       changed ||= (SECTION_SECRETS[key] ?? []).some((s) => !!this.secretDraft()[s.name]?.trim());

@@ -19,6 +19,7 @@ import { channelColor, providerMeta } from '../../shared/utils/providers';
 import { ConnectDialogComponent } from './connect-dialog.component';
 import { SubscribersDrawerComponent } from './subscribers-drawer.component';
 import { WebhookSetupComponent } from './webhook-setup.component';
+import { AddSubredditDialogComponent } from './add-subreddit-dialog.component';
 
 const SOON_MS = 7 * 86_400_000;
 
@@ -37,6 +38,7 @@ const YOUTUBE_CATEGORIES: Record<string, string> = {
 @Component({
   selector: 'app-channels-page',
   imports: [
+    AddSubredditDialogComponent,
     FormsModule,
     RouterLink,
     AvatarComponent,
@@ -161,6 +163,7 @@ const YOUTUBE_CATEGORIES: Record<string, string> = {
     </div>
 
     <app-subscribers-drawer [channel]="subsChannel()" [initialTab]="subsTab()" (closed)="subsChannel.set(null)" />
+    <app-add-subreddit-dialog [channel]="subredditFrom()" (closed)="subredditFrom.set(null)" />
 
     <app-connect-dialog
       [open]="connectOpen()"
@@ -276,6 +279,15 @@ const YOUTUBE_CATEGORIES: Record<string, string> = {
                   <span class="track"></span>
                   <span class="small">Put links in the first comment by default</span>
                 </label>
+              }
+
+              @if (ch.provider === 'reddit' && ws.isAdmin()) {
+                <div class="row-wrap wa-row">
+                  <button type="button" class="btn sm soft" (click)="subredditFrom.set(ch)">
+                    <app-icon name="plus" [size]="14" /> Add subreddit
+                  </button>
+                  <span class="muted tiny">Uses this Reddit account</span>
+                </div>
               }
 
               @if (ch.provider === 'whatsapp') {
@@ -686,6 +698,8 @@ export class ChannelsPage implements OnInit {
   }
 
   protected readonly subsChannel = signal<Channel | null>(null);
+  /** Reddit channel whose account is used for "Add subreddit". */
+  protected readonly subredditFrom = signal<Channel | null>(null);
   protected readonly subsTab = signal<'subscribers' | 'webhook'>('subscribers');
 
   protected openSubscribers(ch: Channel, tab: 'subscribers' | 'webhook') {
@@ -708,6 +722,13 @@ export class ChannelsPage implements OnInit {
       if (cat) out.push(cat);
     }
     if (ch.provider === 'discord' && ch.config['forum']) out.push('Forum channel');
+    if (ch.provider === 'reddit') {
+      if (ch.config['moderator']) out.push('Moderator');
+      const sub = String(ch.config['submission_type'] || 'any');
+      if (sub === 'self') out.push('Text posts only');
+      if (sub === 'link') out.push('Link posts only');
+      if (ch.config['nsfw']) out.push('NSFW');
+    }
     return out;
   }
 
@@ -718,6 +739,10 @@ export class ChannelsPage implements OnInit {
     }
     if (ch.provider === 'wechat') {
       return ch.config['mode'] === 'publish' ? 'Publish link only' : 'Push to followers';
+    }
+    if (ch.provider === 'reddit') {
+      const user = String(ch.config['username'] || ch.name);
+      return ch.external_id?.startsWith('u_') ? `u/${user} (profile)` : `r/${ch.config['subreddit'] || ch.external_id}`;
     }
     return null;
   }
