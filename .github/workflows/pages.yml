@@ -1,0 +1,67 @@
+name: GitHub Pages
+
+# Publishes the web app to GitHub Pages on every push to main.
+# The organization site (markette-org.github.io) has the custom domain markette.org, so this
+# project site is served at https://markette.org/markette-web/.
+# GitHub Pages cannot proxy, so the browser calls the Markette server directly: the server must
+# list the Pages origin (https://markette.org) in CORS_ALLOWED_ORIGINS and DJANGO_CSRF_TRUSTED_ORIGINS.
+# Repository settings:
+#   Settings → Pages → Source: GitHub Actions
+#   variables MARKETTE_API_ORIGIN (default https://api.markette.org)
+#             PAGES_BASE_HREF     (default /markette-web/; set to / with a custom domain on this repo)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Point the app at the API
+        env:
+          MARKETTE_API_ORIGIN: ${{ vars.MARKETTE_API_ORIGIN || 'https://api.markette.org' }}
+        run: |
+          origin="${MARKETTE_API_ORIGIN%/}"
+          if ! [[ "$origin" =~ ^https?://[^/\']+$ ]]; then
+            echo "::error::MARKETTE_API_ORIGIN must be an origin like https://api.markette.org"
+            exit 1
+          fi
+          printf "export const environment = {\n  production: true,\n  apiUrl: '%s',\n};\n" "$origin" > src/environments/environment.ts
+      - name: Build
+        env:
+          BASE_HREF: ${{ vars.PAGES_BASE_HREF || '/markette-web/' }}
+        run: npm run build -- --base-href "$BASE_HREF"
+      - name: Single-page app fallback
+        run: |
+          cp dist/frontend/browser/index.html dist/frontend/browser/404.html
+          touch dist/frontend/browser/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/frontend/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

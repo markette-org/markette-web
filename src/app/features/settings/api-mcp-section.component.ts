@@ -161,7 +161,7 @@ export class McpSnippetsComponent {
           <div class="mob-grid">
             <div class="mob">
               <strong>Android</strong>
-              <a class="btn primary sm" href="/downloads/markette.apk" download><app-icon name="upload" [size]="14" /> Download the APK</a>
+              <a class="btn primary sm" [href]="serverOrigin + '/downloads/markette.apk'" download><app-icon name="upload" [size]="14" /> Download the APK</a>
               <span class="hint">Open the file on your phone. Android asks you to allow installing apps from this source (your browser or file manager) — allow it once, then install. On first launch, enter this server: <span class="mono">{{ serverOrigin }}</span></span>
             </div>
             <div class="mob">

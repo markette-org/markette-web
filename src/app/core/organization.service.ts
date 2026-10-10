@@ -69,8 +69,8 @@ export function inviteLink(token: string, email?: string, origin = defaultOrigin
   return `${origin}/register?${q.toString()}`;
 }
 
-/** Public origin for links (the chosen server in the native app). */
+/** Public origin for links (the chosen server in the native app; the app's base URL on the web, which may be a sub-path). */
 function defaultOrigin(): string {
   const stored = isNative() ? storage.get('markette.server') : null;
-  return stored || location.origin;
+  return stored || document.baseURI.replace(/\/+$/, '');
 }
