@@ -1,0 +1,570 @@
+<div class="page">
+  <app-platform-header title="Settings" subtitle="Installation-wide configuration. Values saved here override the server environment." />
+
+  @if (loading()) {
+    <div class="stack">
+      <div class="skeleton" style="height: 140px"></div>
+      <div class="skeleton" style="height: 220px"></div>
+    </div>
+  } @else if (loadError()) {
+    <div class="form-error" role="alert">{{ loadError() }}</div>
+  } @else if (data(); as d) {
+    @if (d.updated_at) {
+      <p class="muted small updated">Last changed {{ d.updated_at | relTime }}{{ d.updated_by ? ' by ' + d.updated_by : '' }} · {{ d.updated_at | tzDate }}</p>
+    }
+
+    <div class="settings-layout">
+      <nav class="toc" aria-label="Settings sections">
+        <a href="#general" (click)="$event.preventDefault(); scrollTo('general')">General</a>
+        <a href="#announcement" (click)="$event.preventDefault(); scrollTo('announcement')">Announcement</a>
+        <a href="#signups" (click)="$event.preventDefault(); scrollTo('signups')">Sign-ups</a>
+        <a href="#plan" (click)="$event.preventDefault(); scrollTo('plan')">Default plan</a>
+        <a href="#publishing" (click)="$event.preventDefault(); scrollTo('publishing')">Publishing</a>
+        <a href="#ai" (click)="$event.preventDefault(); scrollTo('ai')">AI assistant</a>
+        <a href="#billing" (click)="$event.preventDefault(); scrollTo('billing')">Billing (Stripe)</a>
+        <a href="#networks" (click)="$event.preventDefault(); scrollTo('networks')">Network apps</a>
+      </nav>
+
+      <div class="stack sections">
+        <!-- General -->
+        <section class="card" id="general" aria-labelledby="h-general">
+          <ng-container [ngTemplateOutlet]="head" [ngTemplateOutletContext]="{ id: 'h-general', title: 'General', key: 'general', text: 'How this installation presents itself.' }" />
+          <div class="form-grid">
+            <div class="field">
+              <label for="instance-name">Instance name</label>
+              <input id="instance-name" class="input" [class.invalid]="err('instance_name')" [ngModel]="instanceName()" (ngModelChange)="instanceName.set($event)" maxlength="80" />
+              @if (err('instance_name')) {
+                <span class="error">{{ err('instance_name') }}</span>
+              } @else {
+                <span class="hint">Shown in the sidebar, page titles and sign-in screens.</span>
+              }
+            </div>
+            <div class="field">
+              <label for="support-email">Support email</label>
+              <input id="support-email" type="email" class="input" [class.invalid]="err('support_email')" [ngModel]="supportEmail()" (ngModelChange)="supportEmail.set($event)" placeholder="support@example.com" />
+              @if (err('support_email')) {
+                <span class="error">{{ err('support_email') }}</span>
+              } @else {
+                <span class="hint">Offered as a contact on sign-in and sign-up screens.</span>
+              }
+            </div>
+          </div>
+          <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'general' }" />
+        </section>
+
+        <!-- Announcement -->
+        <section class="card" id="announcement" aria-labelledby="h-announcement">
+          <ng-container [ngTemplateOutlet]="head" [ngTemplateOutletContext]="{ id: 'h-announcement', title: 'Announcement', key: 'announcement', text: 'A banner shown to every signed-in user, e.g. planned maintenance.' }" />
+          <div class="stack">
+            <div class="field">
+              <label for="ann-text">Message</label>
+              <textarea id="ann-text" class="textarea" rows="2" [ngModel]="announcement()" (ngModelChange)="announcement.set($event)" placeholder="Leave empty for no banner"></textarea>
+            </div>
+            <div class="field">
+              <span class="label" id="ann-level-label">Level</span>
+              <div class="segmented" role="radiogroup" aria-labelledby="ann-level-label">
+                <button type="button" role="radio" [attr.aria-checked]="level() === 'info'" [class.active]="level() === 'info'" (click)="level.set('info')">Info</button>
+                <button type="button" role="radio" [attr.aria-checked]="level() === 'warning'" [class.active]="level() === 'warning'" (click)="level.set('warning')">Warning</button>
+                <button type="button" role="radio" [attr.aria-checked]="level() === 'critical'" [class.active]="level() === 'critical'" (click)="level.set('critical')">Critical</button>
+              </div>
+              <span class="hint">Info and warning banners can be dismissed by each user; critical ones stay until you remove them.</span>
+            </div>
+            <div class="field">
+              <span class="label">Preview</span>
+              @if (announcementPreview()) {
+                <div class="ann-preview {{ level() }}">
+                  <app-icon [name]="level() === 'info' ? 'info' : 'alert'" [size]="16" />
+                  <span class="pre-wrap">{{ announcementPreview() }}</span>
+                  @if (level() !== 'critical') {
+                    <app-icon name="x" [size]="14" />
+                  }
+                </div>
+              } @else {
+                <p class="muted small">No banner is shown.</p>
+              }
+            </div>
+          </div>
+          <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'announcement' }" />
+          @if (d.announcement) {
+            <button type="button" class="btn danger-ghost sm clear-ann" (click)="clearAnnouncement()" [disabled]="saving() === 'announcement'">
+              <app-icon name="trash" [size]="14" /> Clear announcement
+            </button>
+          }
+        </section>
+
+        <!-- Sign-ups -->
+        <section class="card" id="signups" aria-labelledby="h-signups">
+          <ng-container [ngTemplateOutlet]="head" [ngTemplateOutletContext]="{ id: 'h-signups', title: 'Sign-ups', key: 'signups', text: 'Who can create an account on their own.' }" />
+          <div class="stack">
+            <div class="segmented" role="radiogroup" aria-label="Sign-up policy">
+              <button type="button" role="radio" [attr.aria-checked]="signupsOpen()" [class.active]="signupsOpen()" (click)="signupsOpen.set(true)">Open sign-up</button>
+              <button type="button" role="radio" [attr.aria-checked]="!signupsOpen()" [class.active]="!signupsOpen()" (click)="signupsOpen.set(false)">Invitation only</button>
+            </div>
+            <p class="muted small">
+              @if (signupsOpen()) {
+                Anyone can register; each self-sign-up gets a new organization with the default plan below.
+              } @else {
+                The sign-up form is hidden. People join only through an invitation from an organization (or one you create in the console). Invitations keep working.
+              }
+            </p>
+            <label class="switch">
+              <input type="checkbox" [checked]="orgCreationOpen()" (change)="orgCreationOpen.set($any($event.target).checked)" />
+              <span class="track"></span>
+              <span>
+                <strong>Allow users to create organizations</strong>
+                <span class="block muted small">
+                  Signed-in users can start additional organizations (each with the default plan below) from the workspace switcher.
+                  When off, only superadmins create organizations; self-sign-up still creates the first one if sign-up is open.
+                </span>
+              </span>
+            </label>
+            <div class="field">
+              <label for="domain-input">Allowed email domains</label>
+              <div class="chip-box" [class.disabled]="!signupsOpen()" (click)="domainEl.focus()">
+                @for (dom of domains(); track dom) {
+                  <span class="chip accent">{{ dom }}<button type="button" class="chip-x" (click)="removeDomain(dom)" [attr.aria-label]="'Remove ' + dom"><app-icon name="x" [size]="11" /></button></span>
+                }
+                <input #domainEl id="domain-input" class="chip-input" [ngModel]="domainInput()" (ngModelChange)="domainInput.set($event)" (keydown)="onDomainKey($event)" (blur)="commitDomain()" placeholder="acme.com" />
+              </div>
+              @if (err('signup_domains')) {
+                <span class="error">{{ err('signup_domains') }}</span>
+              } @else {
+                <span class="hint">Leave empty to allow any address. Applies to self-sign-up only; invitations ignore it.</span>
+              }
+            </div>
+          </div>
+          <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'signups' }" />
+        </section>
+
+        <!-- Default plan -->
+        <section class="card" id="plan" aria-labelledby="h-plan">
+          <ng-container [ngTemplateOutlet]="head" [ngTemplateOutletContext]="{ id: 'h-plan', title: 'Default plan for new organizations', key: 'plan', text: 'Applied to organizations created by self-sign-up and to organizations created in the console without explicit limits. Existing organizations keep their limits.' }" />
+          <div class="limits">
+            @for (l of limits; track l.key) {
+              <div class="field">
+                <label [for]="'lim-' + l.key">{{ l.label }}</label>
+                <div class="row">
+                  <input
+                    [id]="'lim-' + l.key"
+                    type="number"
+                    min="0"
+                    step="1"
+                    class="input"
+                    [class.invalid]="err(l.key)"
+                    [disabled]="limitDraft()[l.key].unlimited"
+                    [ngModel]="limitDraft()[l.key].value"
+                    (ngModelChange)="setLimit(l.key, { value: $event === null ? '' : '' + $event })"
+                    [placeholder]="limitDraft()[l.key].unlimited ? '∞' : '0'"
+                  />
+                  <label class="checkbox nowrap">
+                    <input type="checkbox" [checked]="limitDraft()[l.key].unlimited" (change)="setLimit(l.key, { unlimited: $any($event.target).checked })" />
+                    Unlimited
+                  </label>
+                </div>
+                @if (err(l.key)) {
+                  <span class="error">{{ err(l.key) }}</span>
+                } @else {
+                  <span class="hint">{{ limitDraft()[l.key].unlimited ? 'No limit on ' + l.unit : 'Maximum ' + l.unit }}</span>
+                }
+              </div>
+            }
+          </div>
+          <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'plan' }" />
+        </section>
+
+        <!-- Publishing -->
+        <section class="card" id="publishing" aria-labelledby="h-publishing" [class.danger-card]="d.publishing_paused">
+          <ng-container [ngTemplateOutlet]="head" [ngTemplateOutletContext]="{ id: 'h-publishing', title: 'Publishing', key: 'publishing', text: 'Global controls for the scheduler and workers.' }" />
+          <div class="pause-row" [class.on]="d.publishing_paused">
+            <label class="switch danger-switch">
+              <input #pauseEl type="checkbox" [checked]="d.publishing_paused" [disabled]="pausing()" (change)="togglePause(pauseEl.checked, pauseEl)" />
+              <span class="track"></span>
+              <span>
+                <strong>Pause all publishing</strong>
+                <span class="block muted small">Emergency stop for every organization. Turning it on requires typing PAUSE.</span>
+              </span>
+            </label>
+            @if (pausing()) {
+              <span class="spinner"></span>
+            }
+            @if (d.publishing_paused) {
+              <span class="chip danger"><span class="dot"></span>Paused</span>
+            } @else {
+              <span class="chip success"><span class="dot"></span>Running</span>
+            }
+          </div>
+          <div class="form-grid" style="margin-top: 16px">
+            @for (f of overrideFields.publishing ?? []; track f.name) {
+              <ng-container [ngTemplateOutlet]="ovrTpl" [ngTemplateOutletContext]="{ $implicit: f, section: 'publishing' }" />
+            }
+          </div>
+          <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'publishing' }" />
+        </section>
+
+        <!-- AI -->
+        <section class="card" id="ai" aria-labelledby="h-ai">
+          <ng-container [ngTemplateOutlet]="head" [ngTemplateOutletContext]="{ id: 'h-ai', title: 'AI assistant', key: 'ai', text: 'Powers adapting copy, suggested times and campaign plans through OpenRouter or any OpenAI-compatible API. Workspaces can still switch AI off for themselves; organizations have monthly token quotas.' }" />
+          <div class="stack">
+            <div class="field">
+              <span class="label" id="ai-enabled-label">AI features</span>
+              <div class="row-wrap">
+                <div class="segmented" role="radiogroup" aria-labelledby="ai-enabled-label">
+                  <button type="button" role="radio" [attr.aria-checked]="aiEnabled() === 'auto'" [class.active]="aiEnabled() === 'auto'" (click)="aiEnabled.set('auto')">Automatic</button>
+                  <button type="button" role="radio" [attr.aria-checked]="aiEnabled() === 'true'" [class.active]="aiEnabled() === 'true'" (click)="aiEnabled.set('true')">On</button>
+                  <button type="button" role="radio" [attr.aria-checked]="aiEnabled() === 'false'" [class.active]="aiEnabled() === 'false'" (click)="aiEnabled.set('false')">Off</button>
+                </div>
+                <ng-container [ngTemplateOutlet]="badge" [ngTemplateOutletContext]="{ name: 'AI_ENABLED' }" />
+                <span class="muted small">Currently {{ effective('AI_ENABLED') === 'On' ? 'on' : 'off' }}</span>
+              </div>
+              <span class="hint">Automatic turns AI on when an API key is set, or for a custom API when a base URL is set.</span>
+            </div>
+
+            <div class="field">
+              <div class="row label-row">
+                <span class="label" id="ai-provider-label">Provider</span>
+                <ng-container [ngTemplateOutlet]="badge" [ngTemplateOutletContext]="{ name: 'AI_PROVIDER' }" />
+                <span class="spacer"></span>
+                @if (source('AI_PROVIDER') === 'database') {
+                  <button type="button" class="link-btn tiny" (click)="resetOverride('ai', { name: 'AI_PROVIDER', label: 'Provider' })" [disabled]="saving() === 'ai'">Reset to environment</button>
+                }
+              </div>
+              <div class="provider-pick" role="radiogroup" aria-labelledby="ai-provider-label">
+                @for (p of providers(); track p) {
+                  <button type="button" role="radio" class="provider-opt" [attr.aria-checked]="aiProvider() === p" (click)="setOvr('AI_PROVIDER', p)">
+                    <strong>{{ providerLabel[p] || p }}</strong>
+                    <span class="muted small">
+                      @if (p === 'openrouter') {
+                        One key for hundreds of models from many vendors, with cost reported per request. Get a key at openrouter.ai/keys.
+                      } @else {
+                        Any server that speaks the OpenAI API: OpenAI, Azure OpenAI, Ollama, vLLM, LM Studio, LiteLLM…
+                      }
+                    </span>
+                  </button>
+                }
+              </div>
+            </div>
+
+            @for (s of secretFields.ai ?? []; track s.name) {
+              <ng-container [ngTemplateOutlet]="secretTpl" [ngTemplateOutletContext]="{ $implicit: s, section: 'ai' }" />
+            }
+            @if (aiProvider() === 'openai_compatible') {
+              <p class="hint muted small" style="margin-top: -6px">Local servers (Ollama, vLLM, LM Studio) usually need no key.</p>
+            }
+
+            <div class="form-grid">
+              <div class="field full">
+                <div class="row label-row">
+                  <label for="ovr-AI_BASE_URL">{{ aiProvider() === 'openrouter' ? 'Custom endpoint (advanced)' : 'Base URL' }}</label>
+                  <ng-container [ngTemplateOutlet]="badge" [ngTemplateOutletContext]="{ name: 'AI_BASE_URL' }" />
+                  <span class="spacer"></span>
+                  @if (source('AI_BASE_URL') === 'database') {
+                    <button type="button" class="link-btn tiny" (click)="resetOverride('ai', { name: 'AI_BASE_URL', label: 'Base URL' })" [disabled]="saving() === 'ai'">Reset to environment</button>
+                  }
+                </div>
+                <input
+                  id="ovr-AI_BASE_URL"
+                  type="url"
+                  class="input"
+                  [class.invalid]="err('overrides.AI_BASE_URL')"
+                  [ngModel]="ovr()['AI_BASE_URL']"
+                  (ngModelChange)="setOvr('AI_BASE_URL', $event ?? '')"
+                  [placeholder]="effective('AI_BASE_URL') || (aiProvider() === 'openrouter' ? 'https://openrouter.ai/api/v1' : 'https://api.openai.com/v1')"
+                  autocomplete="off"
+                />
+                @if (err('overrides.AI_BASE_URL')) {
+                  <span class="error">{{ err('overrides.AI_BASE_URL') }}</span>
+                } @else if (aiProvider() === 'openrouter') {
+                  <span class="hint">Leave empty to use https://openrouter.ai/api/v1.</span>
+                } @else {
+                  <span class="hint">Required. Examples: https://api.openai.com/v1 · https://&lt;resource&gt;.openai.azure.com/openai/v1 · http://ollama:11434/v1 · http://vllm:8000/v1 · http://localhost:1234/v1 (LM Studio) · http://litellm:4000</span>
+                }
+              </div>
+              <div class="field full">
+                <div class="row label-row">
+                  <label for="ovr-AI_MODEL">Model</label>
+                  <ng-container [ngTemplateOutlet]="badge" [ngTemplateOutletContext]="{ name: 'AI_MODEL' }" />
+                  <span class="spacer"></span>
+                  @if (source('AI_MODEL') === 'database') {
+                    <button type="button" class="link-btn tiny" (click)="resetOverride('ai', { name: 'AI_MODEL', label: 'Model' })" [disabled]="saving() === 'ai'">Reset to environment</button>
+                  }
+                </div>
+                <input
+                  id="ovr-AI_MODEL"
+                  class="input mono-input"
+                  [class.invalid]="err('overrides.AI_MODEL')"
+                  [ngModel]="ovr()['AI_MODEL']"
+                  (ngModelChange)="setOvr('AI_MODEL', $event ?? '')"
+                  [placeholder]="effective('AI_MODEL') || (aiProvider() === 'openrouter' ? 'openrouter/auto' : 'gpt-4o-mini')"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                @if (err('overrides.AI_MODEL')) {
+                  <span class="error">{{ err('overrides.AI_MODEL') }}</span>
+                } @else {
+                  <span class="hint">e.g. {{ modelExamples() }}</span>
+                }
+              </div>
+              @for (f of aiGenericFields; track f.name) {
+                <ng-container [ngTemplateOutlet]="ovrTpl" [ngTemplateOutletContext]="{ $implicit: f, section: 'ai' }" />
+              }
+            </div>
+            <div class="row-wrap test-row">
+              <button type="button" class="btn" (click)="testAi()" [disabled]="testing()">
+                @if (testing()) {
+                  <span class="spinner"></span>
+                } @else {
+                  <app-icon name="zap" [size]="16" />
+                }
+                Test connection
+              </button>
+              <span class="muted small">Checks the saved provider, key and model without generating anything. Save changes first.</span>
+            </div>
+            @if (testResult(); as r) {
+              <div class="notice" [class.success]="r.ok" [class.danger]="!r.ok" role="status">
+                <app-icon [name]="r.ok ? 'check' : 'alert'" [size]="16" />
+                <span>
+                  {{ r.detail }}
+                  @if (r.model) {
+                    <span class="mono">({{ r.model }})</span>
+                  }
+                </span>
+              </div>
+              @if (r.models?.length) {
+                <div class="field">
+                  <span class="label">Models offered by this provider — click one to use it</span>
+                  <div class="model-list">
+                    @for (m of r.models; track m) {
+                      <button type="button" class="chip outline mono" [class.accent]="ovr()['AI_MODEL'] === m" (click)="useModel(m)">{{ m }}</button>
+                    }
+                  </div>
+                </div>
+              }
+            }
+          </div>
+          <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'ai' }" />
+        </section>
+
+        <!-- Billing -->
+        <section class="card" id="billing" aria-labelledby="h-billing">
+          <ng-container [ngTemplateOutlet]="head" [ngTemplateOutletContext]="{ id: 'h-billing', title: 'Billing (Stripe)', key: 'billing', text: 'Sell plans through Stripe Checkout. Organizations upgrade from their Organization page and manage invoices in the Stripe customer portal.' }" />
+          <div class="stack">
+            @for (s of secretFields.billing ?? []; track s.name) {
+              <ng-container [ngTemplateOutlet]="secretTpl" [ngTemplateOutletContext]="{ $implicit: s, section: 'billing' }" />
+            }
+            <div class="field callback">
+              <span class="label">Webhook endpoint</span>
+              <div class="row">
+                <code class="cb-url truncate">{{ webhookUrl() }}</code>
+                <button type="button" class="btn sm" (click)="copy(webhookUrl())"><app-icon name="copy" [size]="14" /> Copy</button>
+              </div>
+              <span class="hint">
+                In Stripe → Developers → Webhooks, add this endpoint with the events checkout.session.completed, customer.subscription.created,
+                customer.subscription.updated, customer.subscription.deleted, then paste the signing secret here.
+              </span>
+              <div class="row-wrap event-list">
+                @for (e of stripeEvents; track e) {
+                  <code class="chip outline">{{ e }}</code>
+                }
+              </div>
+            </div>
+            <div class="notice accent">
+              <app-icon name="tag" [size]="16" />
+              <span>Then create plans and their Stripe prices in <a routerLink="/platform/plans">Platform → Plans</a>. A plan is purchasable once it has a Stripe price.</span>
+            </div>
+          </div>
+          <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'billing' }" />
+        </section>
+
+        <!-- Network apps -->
+        <section id="networks" class="stack" aria-labelledby="h-networks">
+          <div class="section-title">
+            <div>
+              <h2 id="h-networks">Network apps</h2>
+              <p class="muted small">OAuth app credentials for each network. Register the redirect URI below in each developer console.</p>
+            </div>
+          </div>
+          @for (n of networks; track n.key) {
+            <section class="card" [attr.aria-labelledby]="'h-' + n.key">
+              <div class="card-head">
+                <h3 class="row" [id]="'h-' + n.key"><app-provider-icon [provider]="n.provider" [size]="22" /> {{ n.label }}</h3>
+                @if (isDirty(n.key)) {
+                  <span class="chip warning"><span class="dot"></span>Unsaved changes</span>
+                }
+              </div>
+              @if (n.callback) {
+                <div class="field callback">
+                  <span class="label">Redirect / callback URL</span>
+                  <div class="row">
+                    <code class="cb-url truncate">{{ callbackUrl(n.callback) }}</code>
+                    <button type="button" class="btn sm" (click)="copy(callbackUrl(n.callback))"><app-icon name="copy" [size]="14" /> Copy</button>
+                  </div>
+                  @if (n.note) {
+                    <span class="hint">{{ n.note }}</span>
+                  }
+                </div>
+              } @else if (n.note) {
+                <p class="muted small" style="margin-bottom: 12px">{{ n.note }}</p>
+              }
+              <div class="form-grid">
+                @for (f of overrideFields[n.key] ?? []; track f.name) {
+                  <ng-container [ngTemplateOutlet]="ovrTpl" [ngTemplateOutletContext]="{ $implicit: f, section: n.key }" />
+                }
+              </div>
+              @for (s of secretFields[n.key] ?? []; track s.name) {
+                <div style="margin-top: 14px">
+                  <ng-container [ngTemplateOutlet]="secretTpl" [ngTemplateOutletContext]="{ $implicit: s, section: n.key }" />
+                </div>
+              }
+              <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: n.key }" />
+            </section>
+          }
+        </section>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Section header with dirty indicator -->
+<ng-template #head let-id="id" let-title="title" let-key="key" let-text="text">
+  <div class="card-head sec-head">
+    <div>
+      <h2 [id]="id">{{ title }}</h2>
+      @if (text) {
+        <p class="muted small">{{ text }}</p>
+      }
+    </div>
+    @if (isDirty(key)) {
+      <span class="chip warning"><span class="dot"></span>Unsaved changes</span>
+    }
+  </div>
+</ng-template>
+
+<!-- Section footer: discard + save -->
+<ng-template #foot let-key="key">
+  <div class="sec-foot">
+    @if (isDirty(key)) {
+      <button type="button" class="btn ghost" (click)="discard(key)" [disabled]="saving() === key">Discard</button>
+    }
+    <button type="button" class="btn primary" (click)="save(key)" [disabled]="!isDirty(key) || saving() === key">
+      @if (saving() === key) {
+        <span class="spinner"></span>
+      }
+      Save
+    </button>
+  </div>
+</ng-template>
+
+<!-- Source badge -->
+<ng-template #badge let-name="name">
+  @if (source(name) === 'database') {
+    <span class="chip accent" title="Value saved in the database overrides the environment">Overridden</span>
+  } @else {
+    <span class="chip outline" title="Value comes from the server environment">Environment</span>
+  }
+</ng-template>
+
+<!-- Override field -->
+<ng-template #ovrTpl let-f let-section="section">
+  <div class="field" [class.full]="f.kind === 'bool'">
+    <div class="row label-row">
+      <label [for]="'ovr-' + f.name">{{ f.label }}</label>
+      <ng-container [ngTemplateOutlet]="badge" [ngTemplateOutletContext]="{ name: f.name }" />
+      <span class="spacer"></span>
+      @if (source(f.name) === 'database') {
+        <button type="button" class="link-btn tiny" (click)="resetOverride(section, f)" [disabled]="saving() === section">Reset to environment</button>
+      }
+    </div>
+    @switch (f.kind) {
+      @case ('bool') {
+        <select [id]="'ovr-' + f.name" class="select" [ngModel]="ovr()[f.name]" (ngModelChange)="setOvr(f.name, $event)">
+          <option value="auto">Environment default ({{ effective(f.name) || 'Off' }})</option>
+          <option value="true">On</option>
+          <option value="false">Off</option>
+        </select>
+      }
+      @case ('effort') {
+        <select [id]="'ovr-' + f.name" class="select" [ngModel]="ovr()[f.name]" (ngModelChange)="setOvr(f.name, $event)">
+          <option value="">{{ effective(f.name) ? 'Environment default (' + effective(f.name) + ')' : 'Model default' }}</option>
+          @for (e of efforts(); track e) {
+            <option [value]="e">{{ e }}</option>
+          }
+        </select>
+      }
+      @case ('output') {
+        <select [id]="'ovr-' + f.name" class="select" [ngModel]="ovr()[f.name]" (ngModelChange)="setOvr(f.name, $event)">
+          <option value="">Environment default{{ effective(f.name) ? ' (' + (outputLabel[effective(f.name)] || effective(f.name)) + ')' : '' }}</option>
+          @for (m of outputModes(); track m) {
+            <option [value]="m">{{ outputLabel[m] || m }}</option>
+          }
+        </select>
+      }
+      @default {
+        <input
+          [id]="'ovr-' + f.name"
+          class="input"
+          [class.invalid]="err('overrides.' + f.name)"
+          [type]="f.kind === 'number' ? 'number' : 'text'"
+          [attr.step]="f.step || null"
+          [attr.min]="f.min ?? null"
+          [attr.max]="f.max ?? null"
+          [ngModel]="ovr()[f.name]"
+          (ngModelChange)="setOvr(f.name, $event === null ? '' : '' + $event)"
+          [placeholder]="effective(f.name) || 'Not set'"
+          autocomplete="off"
+        />
+      }
+    }
+    @if (err('overrides.' + f.name)) {
+      <span class="error">{{ err('overrides.' + f.name) }}</span>
+    } @else if (f.hint) {
+      <span class="hint">{{ f.hint }}</span>
+    }
+  </div>
+</ng-template>
+
+<!-- Write-only secret -->
+<ng-template #secretTpl let-s let-section="section">
+  <div class="field secret">
+    <div class="row label-row">
+      <span class="label">{{ s.label }}</span>
+      <span class="chip" [class.success]="secret(s.name).set" [class.danger]="!secret(s.name).set">
+        <app-icon [name]="secret(s.name).set ? 'lock' : 'alert'" [size]="12" /> {{ secretStatus(s.name) }}
+      </span>
+    </div>
+    @if (secretEditing()[s.name]) {
+      <div class="row">
+        <input
+          type="password"
+          class="input"
+          [class.invalid]="err('secrets.' + s.name)"
+          [attr.aria-label]="'New ' + s.label"
+          [ngModel]="secretDraft()[s.name]"
+          (ngModelChange)="setSecret(s.name, $event)"
+          placeholder="Paste the new value"
+          autocomplete="new-password"
+        />
+        <button type="button" class="btn ghost sm" (click)="editSecret(s.name, false)">Cancel</button>
+      </div>
+      <span class="hint">Saved encrypted and never shown again. Click Save below to store it.</span>
+    } @else {
+      <div class="row-wrap">
+        <button type="button" class="btn sm" (click)="editSecret(s.name, true)">
+          <app-icon name="edit" [size]="14" /> {{ secret(s.name).set ? 'Replace' : 'Set' }}
+        </button>
+        @if (secret(s.name).source === 'database') {
+          <button type="button" class="btn danger-ghost sm" (click)="clearSecret(section, s)" [disabled]="saving() === section">
+            <app-icon name="trash" [size]="14" /> Clear
+          </button>
+        }
+        @if (secret(s.name).source === 'environment') {
+          <span class="muted tiny">Comes from the environment; setting a value here overrides it.</span>
+        }
+      </div>
+    }
+    @if (err('secrets.' + s.name)) {
+      <span class="error">{{ err('secrets.' + s.name) }}</span>
+    } @else if (secretHints[s.name]) {
+      <span class="hint">{{ secretHints[s.name] }}</span>
+    }
+  </div>
+</ng-template>

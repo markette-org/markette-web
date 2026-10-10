@@ -1,0 +1,182 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <div class="eyebrow">Posts</div>
+      <h1>All posts</h1>
+      <p class="subtitle">Drafts, scheduled and published content across every channel.</p>
+    </div>
+    @if (ws.canWrite()) {
+      <div class="actions">
+        <a routerLink="/compose" class="btn primary"><app-icon name="plus" [size]="16" /> New post</a>
+      </div>
+    }
+  </header>
+
+  <div class="view-tabs segmented" role="tablist" aria-label="Review views">
+    @for (v of views; track v.value) {
+      <button type="button" role="tab" [attr.aria-selected]="view() === v.value" (click)="setView(v.value)">{{ v.label }}</button>
+    }
+  </div>
+
+  <div class="filters card tight" role="search">
+    <div class="search">
+      <app-icon name="search" [size]="16" />
+      <label class="sr-only" for="posts-search">Search posts</label>
+      <input id="posts-search" class="input" type="search" placeholder="Search title or text…" [value]="search()" (input)="onSearch($any($event.target).value)" />
+    </div>
+    <label class="sr-only" for="f-status">Status</label>
+    <select id="f-status" class="select" (change)="setFilter('status', $any($event.target).value)">
+      @for (s of statuses; track s.value) {
+        <option [value]="s.value" [selected]="s.value === status()">{{ s.label }}</option>
+      }
+    </select>
+    <label class="sr-only" for="f-channel">Channel</label>
+    <select id="f-channel" class="select" (change)="setFilter('channel', $any($event.target).value)">
+      <option value="" [selected]="!channel()">All channels</option>
+      @for (c of catalog.channels(); track c.id) {
+        <option [value]="c.id" [selected]="channel() === '' + c.id">{{ c.name }} · {{ c.provider_label }}</option>
+      }
+    </select>
+    <label class="sr-only" for="f-campaign">Campaign</label>
+    <select id="f-campaign" class="select" (change)="setFilter('campaign', $any($event.target).value)">
+      <option value="" [selected]="!campaign()">All campaigns</option>
+      @for (c of catalog.campaigns(); track c.id) {
+        <option [value]="c.id" [selected]="campaign() === '' + c.id">{{ c.name }}</option>
+      }
+    </select>
+    @if (hasFilters()) {
+      <button type="button" class="btn ghost sm" (click)="clearFilters()"><app-icon name="x" [size]="14" /> Clear</button>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="notice danger" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <div class="spacer">{{ error() }}</div>
+      <button type="button" class="btn sm" (click)="load()">Retry</button>
+    </div>
+  }
+
+  <div class="card flush list" [attr.aria-busy]="loading()">
+    @if (loading() && !rows().length) {
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div class="row-item">
+          <div class="skeleton" style="width: 56px; height: 56px; border-radius: 10px"></div>
+          <div class="stack-sm" style="flex: 1">
+            <div class="skeleton" style="width: 60%"></div>
+            <div class="skeleton" style="width: 35%"></div>
+          </div>
+        </div>
+      }
+    } @else if (!rows().length) {
+      @if (view() === 'mine' && !status() && !channel() && !campaign() && !search()) {
+        <app-empty-state icon="check" title="Nothing waiting for your review" text="Posts that team members submit for approval appear here.">
+          <button type="button" class="btn" (click)="setView('')">Show all posts</button>
+        </app-empty-state>
+      } @else if (hasFilters()) {
+        <app-empty-state icon="search" title="No posts match these filters" text="Try another view, status, channel or search term.">
+          <button type="button" class="btn" (click)="clearFilters()">Clear filters</button>
+        </app-empty-state>
+      } @else {
+        <app-empty-state icon="compose" title="No posts yet" text="Write once, adapt it per network and schedule it at the best time for each audience.">
+          @if (ws.canWrite()) {
+            <a routerLink="/compose" class="btn primary"><app-icon name="plus" [size]="16" /> Compose your first post</a>
+          }
+        </app-empty-state>
+      }
+    } @else {
+      <ul class="list-reset">
+        @for (p of rows(); track p.id) {
+          <li class="row-item" [class.dim]="busy() === p.id">
+            <a class="thumb" [routerLink]="['/posts', p.id]" [attr.aria-label]="'Open post ' + (p.title || p.id)">
+              @if (thumb(p); as src) {
+                <img [src]="src" alt="" loading="lazy" />
+              } @else if (hasVideo(p)) {
+                <app-icon name="video" [size]="20" />
+              } @else {
+                <app-icon name="posts" [size]="20" />
+              }
+            </a>
+            <div class="main">
+              <a class="title" [routerLink]="['/posts', p.id]">
+                @if (p.title) {
+                  <strong>{{ p.title }}</strong>
+                }
+                <span class="clamp-2" [class.muted]="!!p.title">{{ p.title ? p.body : excerpt(p) || '(empty post)' }}</span>
+              </a>
+              <div class="meta row-wrap">
+                <app-status-chip [status]="p.status" />
+                <app-approval-chip [status]="p.approval_status" [title]="approvalTitle(p)" />
+                @if (p.campaign && catalog.campaignMap().get(p.campaign); as c) {
+                  <span class="chip outline"><span class="color-dot" [style.background]="c.color"></span>{{ c.name }}</span>
+                }
+                @for (t of p.targets; track t.id) {
+                  <span class="tchip t-{{ t.status }}" [attr.title]="tooltip(t)">
+                    <app-provider-icon [provider]="t.channel_detail.provider" [size]="14" />
+                    <span class="truncate tname">{{ t.channel_detail.name }}</span>
+                    @if (t.status === 'failed') {
+                      <app-icon name="alert" [size]="12" />
+                    } @else if (t.status === 'published') {
+                      <app-icon name="check" [size]="12" />
+                    } @else if (t.status === 'scheduled') {
+                      <app-icon name="clock" [size]="12" />
+                    }
+                  </span>
+                }
+                @if (!p.targets.length) {
+                  <span class="tiny muted">No channels selected</span>
+                }
+              </div>
+            </div>
+            <div class="stats">
+              @if (totals(p); as tot) {
+                @if (tot.hasMetrics) {
+                  <div class="stat" title="Engagements across channels"><app-icon name="heart" [size]="14" /> {{ tot.engagements | num }}</div>
+                  <div class="stat" title="Impressions across channels"><app-icon name="eye" [size]="14" /> {{ tot.impressions | num }}</div>
+                }
+              }
+              @if (nextTime(p); as nt) {
+                <div class="stat accent" title="Next publication"><app-icon name="clock" [size]="14" /> {{ nt }}</div>
+              }
+              <div class="tiny muted" [attr.title]="p.updated_at | tzDate">Updated {{ p.updated_at | relTime }}</div>
+            </div>
+            <div class="row-actions">
+              @if (editable(p)) {
+                <a class="btn sm" [routerLink]="['/posts', p.id, 'edit']" aria-label="Edit post"><app-icon name="edit" [size]="14" /> Edit</a>
+              } @else {
+                <a class="btn sm" [routerLink]="['/posts', p.id]">View</a>
+              }
+              @if (ws.canWrite()) {
+                <details class="more">
+                  <summary class="btn sm icon" aria-label="More actions"><app-icon name="more" [size]="16" /></summary>
+                  <div class="menu" role="menu" (click)="$any($event.currentTarget).parentElement.removeAttribute('open')">
+                    <a class="menu-item" role="menuitem" [routerLink]="['/posts', p.id]"><app-icon name="eye" [size]="16" /> View details</a>
+                    <button type="button" class="menu-item" role="menuitem" (click)="duplicate(p)"><app-icon name="copy" [size]="16" /> Duplicate</button>
+                    @if (hasFailed(p)) {
+                      <button type="button" class="menu-item" role="menuitem" (click)="retry(p)"><app-icon name="refresh" [size]="16" /> Retry failed</button>
+                    }
+                    @if (p.status === 'scheduled') {
+                      <button type="button" class="menu-item" role="menuitem" (click)="unschedule(p)"><app-icon name="pause" [size]="16" /> Unschedule</button>
+                    }
+                    <div class="menu-sep"></div>
+                    <button type="button" class="menu-item danger" role="menuitem" (click)="remove(p)"><app-icon name="trash" [size]="16" /> Delete</button>
+                  </div>
+                </details>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+
+  @if (count() > rows().length || hasPrev()) {
+    <nav class="pager" aria-label="Pagination">
+      <span class="muted small tabular">{{ pageLabel() }}</span>
+      <div class="btn-group">
+        <button type="button" class="btn sm" [disabled]="!hasPrev() || loading()" (click)="page(-1)"><app-icon name="chevronLeft" [size]="14" /> Prev</button>
+        <button type="button" class="btn sm" [disabled]="!hasNext() || loading()" (click)="page(1)">Next <app-icon name="chevronRight" [size]="14" /></button>
+      </div>
+    </nav>
+  }
+</div>

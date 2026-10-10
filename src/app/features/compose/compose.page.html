@@ -1,0 +1,987 @@
+<div class="page compose">
+  <header class="page-header">
+    <div>
+      <div class="eyebrow">{{ isEdit() ? 'Edit post' : 'Compose' }}</div>
+      <h1 class="row">
+        {{ isEdit() ? post()!.title || 'Untitled post' : 'Create a post' }}
+        @if (post(); as p) {
+          <app-status-chip [status]="p.status" />
+        }
+      </h1>
+      <p class="subtitle">Write once, tailor per network, then publish now or let Markette pick the moment.</p>
+    </div>
+    <div class="actions">
+      @if (post(); as p) {
+        <a class="btn ghost" [routerLink]="['/posts', p.id]"><app-icon name="eye" [size]="16" /> View post</a>
+      }
+      @if (ws.aiEnabled() && selected().length && body().trim()) {
+        <button type="button" class="btn ai" (click)="openAdapt()"><app-icon name="sparkles" [size]="16" /> Adapt for each network</button>
+      }
+    </div>
+  </header>
+
+  @if (post(); as p) {
+    @switch (p.approval_status) {
+      @case ('pending') {
+        <div class="notice warning approval-banner" role="status">
+          <app-icon name="clock" [size]="18" />
+          <div>
+            <strong>Waiting for review.</strong>
+            Submitted{{ p.submitted_by_name ? ' by ' + p.submitted_by_name : '' }}{{ p.submitted_at ? ' ' + (p.submitted_at | relTime) : '' }}.
+            Nothing is scheduled until a reviewer approves it. Editing keeps it in review.
+          </div>
+        </div>
+      }
+      @case ('changes_requested') {
+        <div class="notice danger approval-banner" role="status">
+          <app-icon name="message" [size]="18" />
+          <div class="stack-sm">
+            <strong>Changes requested{{ p.reviewed_by_name ? ' by ' + p.reviewed_by_name : '' }}</strong>
+            @if (lastChangeRequest(); as r) {
+              <blockquote class="review-quote pre-wrap">{{ r.comment }}</blockquote>
+            }
+            <span class="small">Update the post, then submit it for review again.</span>
+          </div>
+        </div>
+      }
+      @case ('approved') {
+        <div class="notice success approval-banner" role="status">
+          <app-icon name="check" [size]="18" />
+          <div>
+            <strong>Approved{{ p.reviewed_by_name ? ' by ' + p.reviewed_by_name : '' }}.</strong>
+            @if (p.needs_approval) {
+              Saving changes sends it back to draft and it will need approval again.
+            }
+          </div>
+        </div>
+      }
+    }
+    @if (hiddenTargets() > 0) {
+      <div class="notice approval-banner">
+        <app-icon name="lock" [size]="16" />
+        <span>{{ hiddenTargets() }} more {{ hiddenTargets() === 1 ? 'channel is' : 'channels are' }} managed by other teams. Those publications are kept as they are when you save.</span>
+      </div>
+    }
+  }
+
+  @if (loading()) {
+    <div class="grid" style="gap: 12px">
+      <div class="skeleton" style="height: 90px"></div>
+      <div class="skeleton" style="height: 260px"></div>
+    </div>
+  } @else if (loadError()) {
+    <div class="card"><app-empty-state icon="alert" title="This post could not be loaded" [text]="loadError()"><a routerLink="/posts" class="btn">Back to posts</a></app-empty-state></div>
+  } @else if (!catalog.channels().length) {
+    <div class="card">
+      <app-empty-state icon="channels" title="Connect a channel first" text="Markette publishes to the social accounts and blogs you connect. Add one, then come back to write your first post.">
+        <a routerLink="/channels" class="btn primary"><app-icon name="plus" [size]="16" /> Connect a channel</a>
+      </app-empty-state>
+    </div>
+  } @else {
+    @if (sharedBanner()) {
+      <div class="notice accent shared-banner" role="status">
+        <app-icon name="inbox" [size]="18" />
+        <div class="stack-sm" style="flex: 1; min-width: 0">
+          <strong>Shared from another app — pick channels and when to publish.</strong>
+          @if (ws.workspaces().length > 1) {
+            <label class="row small">
+              <span class="muted">Workspace</span>
+              <select class="select sm" [ngModel]="ws.slug()" (ngModelChange)="switchSharedWorkspace($event)">
+                @for (w of ws.workspaces(); track w.id) {
+                  @if (!w.is_archived) {
+                    <option [value]="w.slug">{{ w.organization_name ? w.organization_name + ' · ' : '' }}{{ w.name }}</option>
+                  }
+                }
+              </select>
+            </label>
+          }
+        </div>
+        <button type="button" class="btn ghost icon sm" (click)="dismissShared()" aria-label="Dismiss"><app-icon name="x" [size]="14" /></button>
+      </div>
+    }
+    <div class="layout">
+      <!-- ===================== Editor column ===================== -->
+      <div class="editor stack">
+        <!-- Channel picker -->
+        <section class="card" aria-labelledby="pick-h">
+          <div class="card-head">
+            <h2 id="pick-h">Publish to</h2>
+            <div class="row">
+              <span class="muted small">{{ selected().length }} selected</span>
+              @if (relevantUnselected()) {
+                <button type="button" class="link-btn small" (click)="selectAll()">Select all</button>
+              }
+            </div>
+          </div>
+          <div class="channel-picker" role="group" aria-label="Channels relevant to this workspace">
+            @for (ch of relevantAvailable(); track ch.id) {
+              <button
+                type="button"
+                class="ch-toggle"
+                [class.on]="isSelected(ch.id)"
+                [class.warn]="ch.status === 'needs_reauth'"
+                [attr.aria-pressed]="isSelected(ch.id)"
+                [attr.title]="ch.name + (ch.handle ? ' · @' + ch.handle.replace('@', '') : '') + (ch.status === 'needs_reauth' ? ' — needs reconnecting' : '')"
+                [style.--ch]="channelColor(ch)"
+                (click)="toggleChannel(ch)"
+              >
+                <app-avatar [src]="ch.avatar_url" [name]="ch.name" [provider]="ch.provider" [size]="36" />
+                <span class="ch-name truncate">{{ ch.name }}</span>
+                @if (ch.approval_required) {
+                  <span class="review-mark" title="Posts to this channel need a reviewer's approval"><app-icon name="users" [size]="12" /></span>
+                }
+                @if (isSelected(ch.id)) {
+                  <span class="tick"><app-icon name="check" [size]="12" [stroke]="3" /></span>
+                }
+              </button>
+            } @empty {
+              <p class="muted small">No channels are marked relevant for this workspace yet — pick from the organization's channels below.</p>
+            }
+          </div>
+          <app-more-channels [count]="otherAvailable().length" [forceOpen]="otherSelected() || !relevantAvailable().length">
+            <div class="channel-picker" role="group" aria-label="More channels from your organization">
+              @for (ch of otherAvailable(); track ch.id) {
+                <button
+                  type="button"
+                  class="ch-toggle"
+                  [class.on]="isSelected(ch.id)"
+                  [class.warn]="ch.status === 'needs_reauth'"
+                  [attr.aria-pressed]="isSelected(ch.id)"
+                  [attr.title]="ch.name + (ch.handle ? ' · @' + ch.handle.replace('@', '') : '') + (ch.status === 'needs_reauth' ? ' — needs reconnecting' : '')"
+                  [style.--ch]="channelColor(ch)"
+                  (click)="toggleChannel(ch)"
+                >
+                  <app-avatar [src]="ch.avatar_url" [name]="ch.name" [provider]="ch.provider" [size]="36" />
+                  <span class="ch-name truncate">{{ ch.name }}</span>
+                  @if (ch.approval_required) {
+                    <span class="review-mark" title="Posts to this channel need a reviewer's approval"><app-icon name="users" [size]="12" /></span>
+                  }
+                  @if (isSelected(ch.id)) {
+                    <span class="tick"><app-icon name="check" [size]="12" [stroke]="3" /></span>
+                  }
+                </button>
+              }
+            </div>
+          </app-more-channels>
+        </section>
+
+        <!-- Content -->
+        <section class="card content-card" aria-labelledby="content-h">
+          <h2 id="content-h" class="sr-only">Content</h2>
+          @if (states().length) {
+            <div class="tabs" role="tablist" aria-label="Edit text per channel">
+              <button type="button" role="tab" [attr.aria-selected]="tab() === 'all'" (click)="tab.set('all')">
+                <app-icon name="layers" [size]="15" /> All channels
+              </button>
+              @for (s of states(); track s.channel.id) {
+                <button type="button" role="tab" [attr.aria-selected]="tab() === s.channel.id" (click)="tab.set(s.channel.id); previewFor.set(s.channel.id)">
+                  <app-provider-icon [provider]="s.channel.provider" [size]="16" />
+                  <span class="truncate tab-name">{{ s.channel.name }}</span>
+                  @if (s.problems.length && !s.locked) {
+                    <span class="tab-dot danger" aria-label="has issues"></span>
+                  } @else if (s.customized) {
+                    <span class="tab-dot" aria-label="customised"></span>
+                  }
+                </button>
+              }
+            </div>
+          }
+
+          @if (activeState(); as s) {
+            <!-- Per-channel override -->
+            <div class="stack tab-panel" role="tabpanel">
+              @if (s.locked) {
+                <div class="notice success"><app-icon name="check" [size]="16" /> Already {{ s.targetStatus }} on {{ s.channel.name }}; this copy can no longer change.</div>
+              }
+              <div class="row-wrap">
+                <app-channel-badge [channel]="s.channel" [size]="30" />
+                <span class="spacer"></span>
+                @if (s.customized) {
+                  <span class="chip accent">Custom copy</span>
+                  <button type="button" class="btn sm ghost" (click)="resetDraft(s.channel.id)" [disabled]="s.locked">Use shared text</button>
+                } @else {
+                  <span class="chip">Uses shared text</span>
+                }
+              </div>
+              @if (s.needsTitle) {
+                <div class="field">
+                  <label [for]="'title-' + s.channel.id">{{ s.isNewsletter ? 'Email subject' : s.forumThread && !s.isBlog ? 'Thread name' : 'Title' }} for {{ s.channel.name }}</label>
+                  <input
+                    class="input"
+                    [id]="'title-' + s.channel.id"
+                    [ngModel]="draft(s.channel.id).title"
+                    (ngModelChange)="patchDraft(s.channel.id, { title: $event })"
+                    [placeholder]="title() || 'Post title'"
+                    [disabled]="s.locked"
+                  />
+                </div>
+              }
+              <div class="field">
+                <div class="row">
+                  <label [for]="'body-' + s.channel.id">Text for {{ s.channel.name }}</label>
+                  <span class="spacer"></span>
+                  <app-char-counter [count]="s.count" [max]="s.max" />
+                </div>
+                <textarea
+                  class="textarea body-input"
+                  [id]="'body-' + s.channel.id"
+                  rows="8"
+                  [ngModel]="draft(s.channel.id).body"
+                  (ngModelChange)="patchDraft(s.channel.id, { body: $event })"
+                  [placeholder]="body() || 'Leave empty to use the shared text'"
+                  [disabled]="s.locked"
+                ></textarea>
+                <div class="row-wrap">
+                  <span class="hint">Leave blank to use the shared text.</span>
+                  @if (!draft(s.channel.id).body && body()) {
+                    <button type="button" class="link-btn small" (click)="copySharedInto(s.channel.id)" [disabled]="s.locked">Start from shared text</button>
+                  }
+                </div>
+              </div>
+
+              @if (s.channel.provider === 'whatsapp') {
+                @if ((s.channel.setup?.subscribers ?? 0) > 0) {
+                  <div class="notice success small">
+                    <app-icon name="users" [size]="16" />
+                    <span>Sent as your approved template to {{ s.channel.setup?.subscribers }} opted-in {{ s.channel.setup?.subscribers === 1 ? 'subscriber' : 'subscribers' }} (Meta bills marketing messages per delivery).</span>
+                  </div>
+                } @else {
+                  <div class="notice warning small">
+                    <app-icon name="alert" [size]="16" />
+                    <span>No opted-in subscribers yet — manage them on the <a routerLink="/channels">Channels page</a>.</span>
+                  </div>
+                }
+              } @else if (s.channel.provider === 'qq' && s.channel.config['kind'] === 'group') {
+                <p class="hint muted small">QQ groups accept plain text and one image; links are not allowed.</p>
+              }
+              <!-- Provider options -->
+              @if (s.isBlog) {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>{{ s.channel.provider === 'wechat' ? 'WeChat article options' : 'Blog options' }}</legend>
+                  @if (s.channel.provider === 'wechat') {
+                  <div class="form-grid">
+                    <div class="field full">
+                      <label [for]="'wxmode-' + s.channel.id">Publishing</label>
+                      <select class="select" [id]="'wxmode-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'wechat_mode')" (ngModelChange)="setOption(s.channel.id, 'wechat_mode', $event)">
+                        <option value="">Channel default ({{ wechatDefaultLabel(s.channel) }})</option>
+                        <option value="push">Push to followers</option>
+                        <option value="publish">Publish link only</option>
+                      </select>
+                      <span class="hint">Push sends to all followers (uses the mass-send quota, verified accounts only) and appears in the history list. Publish only creates a permanent link: no push, not in the history list.</span>
+                    </div>
+                    <div class="field full">
+                      <div class="row">
+                        <label [for]="'ex-' + s.channel.id">Digest (summary)</label>
+                        <span class="spacer"></span>
+                        <app-char-counter [count]="optionString(s.channel.id, 'excerpt').length" [max]="120" />
+                      </div>
+                      <textarea class="textarea" rows="2" maxlength="120" [id]="'ex-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'excerpt')" (ngModelChange)="setOption(s.channel.id, 'excerpt', $event)" placeholder="Shown under the title in chats and the article list"></textarea>
+                    </div>
+                    <p class="hint muted small full">Title up to 64 characters; the first image is the cover and must be a JPEG or PNG.</p>
+                  </div>
+                  } @else {
+                  <div class="form-grid">
+                    <div class="field">
+                      <label [for]="'st-' + s.channel.id">Publish as</label>
+                      <select class="select" [id]="'st-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'status') || 'publish'" (ngModelChange)="setOption(s.channel.id, 'status', $event)">
+                        <option value="publish">Published post</option>
+                        <option value="draft">Draft on the site</option>
+                      </select>
+                    </div>
+                    @if (s.channel.provider === 'medium') {
+                    <div class="field">
+                      <label [for]="'canon-' + s.channel.id">Canonical URL</label>
+                      <input class="input" type="url" [id]="'canon-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'canonical_url')" (ngModelChange)="setOption(s.channel.id, 'canonical_url', $event)" [placeholder]="link() || 'Original article, if cross-posting'" />
+                      <span class="hint">Tells search engines where the original lives; defaults to the post link</span>
+                    </div>
+                    } @else {
+                    <div class="field">
+                      <label [for]="'slug-' + s.channel.id">Slug</label>
+                      <input class="input" [id]="'slug-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'slug')" (ngModelChange)="setOption(s.channel.id, 'slug', $event)" placeholder="auto from title" />
+                    </div>
+                    <div class="field full">
+                      <label [for]="'ex-' + s.channel.id">Excerpt</label>
+                      <textarea class="textarea" rows="2" [id]="'ex-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'excerpt')" (ngModelChange)="setOption(s.channel.id, 'excerpt', $event)"></textarea>
+                    </div>
+                    }
+                    @if (s.channel.provider !== 'medium' && s.channel.provider !== 'ghost') {
+                    <div class="field">
+                      <label [for]="'cat-' + s.channel.id">Categories</label>
+                      <input class="input" [id]="'cat-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'categories')" (change)="setListOption(s.channel.id, 'categories', $any($event.target).value)" placeholder="News, Product" />
+                      <span class="hint">Comma separated</span>
+                    </div>
+                    }
+                    <div class="field">
+                      <label [for]="'btags-' + s.channel.id">Tags</label>
+                      <input class="input" [id]="'btags-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'tags')" (change)="setListOption(s.channel.id, 'tags', $any($event.target).value)" [placeholder]="tags().join(', ') || 'Defaults to post tags'" />
+                      <span class="hint">Comma separated; empty uses the post tags{{ s.channel.provider === 'medium' ? '. Medium keeps the first 3' : '' }}</span>
+                    </div>
+                    @if (s.channel.provider === 'ghost') {
+                    <div class="field">
+                      <label [for]="'gnl-' + s.channel.id">Email to newsletter</label>
+                      <input
+                        class="input"
+                        [id]="'gnl-' + s.channel.id"
+                        [disabled]="ghostWebOnly(s.channel.id)"
+                        [ngModel]="ghostWebOnly(s.channel.id) ? '' : optionString(s.channel.id, 'newsletter')"
+                        (ngModelChange)="setGhostNewsletter(s.channel.id, false, $event ?? '')"
+                        [placeholder]="ghostDefault(s.channel) ? 'Channel default: ' + ghostDefault(s.channel) : 'Channel default: web only'"
+                      />
+                      <label class="checkbox small">
+                        <input type="checkbox" [checked]="ghostWebOnly(s.channel.id)" (change)="setGhostNewsletter(s.channel.id, $any($event.target).checked, '')" />
+                        Web only — don't email this post
+                      </label>
+                    </div>
+                    <div class="field">
+                      <label [for]="'gseg-' + s.channel.id">Recipients</label>
+                      <select class="select" [id]="'gseg-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'email_segment')" (ngModelChange)="setOption(s.channel.id, 'email_segment', $event)">
+                        <option value="">All members</option>
+                        <option value="status:free">Free members</option>
+                        <option value="status:-free">Paid members</option>
+                      </select>
+                    </div>
+                    <div class="full">
+                      @if (s.emailed) {
+                        <span class="chip accent"><app-icon name="send" [size]="12" /> Also emailed to members</span>
+                      } @else {
+                        <span class="hint">Published on the web only{{ optionString(s.channel.id, 'status') === 'draft' ? ' (drafts are never emailed)' : '' }}.</span>
+                      }
+                    </div>
+                    }
+                  </div>
+                  }
+                </fieldset>
+              } @else if (s.isNewsletter) {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>Email options</legend>
+                  <div class="field">
+                    <div class="row">
+                      <label [for]="'pre-' + s.channel.id">Inbox preview text</label>
+                      <span class="spacer"></span>
+                      <app-char-counter [count]="optionString(s.channel.id, 'preheader').length" [max]="200" />
+                    </div>
+                    <input class="input" maxlength="200" [id]="'pre-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'preheader')" (ngModelChange)="setOption(s.channel.id, 'preheader', $event)" placeholder="Shown next to the subject in the inbox" />
+                    <span class="hint">The title is the email subject. The text is Markdown; the first image becomes the hero (unless used in the text), the post link adds a "Read more" button, and an unsubscribe link is always added. Sent to {{ s.channel.followers_count ?? 'all' }} subscribers of {{ s.channel.name }}.</span>
+                  </div>
+                </fieldset>
+              } @else if (s.channel.provider === 'youtube') {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>YouTube options</legend>
+                  <div class="notice warning small" style="margin-bottom: 12px">
+                    <app-icon name="alert" [size]="16" />
+                    <span>Until your Google Cloud project passes YouTube's API audit, YouTube keeps uploaded videos private regardless of this setting.</span>
+                  </div>
+                  <div class="form-grid">
+                    <div class="field">
+                      <label [for]="'ytp-' + s.channel.id">Visibility</label>
+                      <select class="select" [id]="'ytp-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'privacy')" (ngModelChange)="setOption(s.channel.id, 'privacy', $event)">
+                        <option value="">Channel default ({{ youtubePrivacyDefault(s.channel) }})</option>
+                        <option value="public">Public</option>
+                        <option value="unlisted">Unlisted</option>
+                        <option value="private">Private</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label [for]="'ytc-' + s.channel.id">Category</label>
+                      <select class="select" [id]="'ytc-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'category_id')" (ngModelChange)="setOption(s.channel.id, 'category_id', $event)">
+                        <option value="">Channel default ({{ youtubeCategoryDefault(s.channel) }})</option>
+                        @for (c of ytCategories; track c.id) {
+                          <option [value]="c.id">{{ c.label }}</option>
+                        }
+                      </select>
+                    </div>
+                    <label class="checkbox full">
+                      <input type="checkbox" [ngModel]="optionFlag(s.channel.id, 'made_for_kids')" (ngModelChange)="setOption(s.channel.id, 'made_for_kids', $event || null)" />
+                      Made for kids <span class="muted small">— required by COPPA when the video is directed at children</span>
+                    </label>
+                    <span class="hint full">One video; the title (≤ 100 characters, no &lt; or &gt;) and the text become the video title and description (≤ 5,000). Shorts: upload a vertical video up to 3 minutes.</span>
+                  </div>
+                </fieldset>
+              } @else if (s.channel.provider === 'discord') {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>Discord options</legend>
+                  <div class="stack-sm">
+                    <label class="checkbox">
+                      <input
+                        type="checkbox"
+                        [ngModel]="s.forumThread"
+                        [disabled]="!!s.channel.config['forum']"
+                        (ngModelChange)="setOption(s.channel.id, 'forum_thread', $event || null)"
+                      />
+                      Post as a new forum thread <span class="muted small">— uses the title as the thread name{{ s.channel.config['forum'] ? '; this channel is a forum' : '' }}</span>
+                    </label>
+                    <span class="hint">Text over 2,000 characters is split into several messages (6,000 max); up to 10 attachments. Mentions such as &#64;everyone are disabled.</span>
+                  </div>
+                </fieldset>
+              } @else if (s.channel.provider === 'mastodon') {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>Mastodon options</legend>
+                  <div class="form-grid">
+                    <div class="field">
+                      <label [for]="'vis-' + s.channel.id">Visibility</label>
+                      <select class="select" [id]="'vis-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'visibility') || 'public'" (ngModelChange)="setOption(s.channel.id, 'visibility', $event)">
+                        <option value="public">Public</option>
+                        <option value="unlisted">Unlisted</option>
+                        <option value="private">Followers only</option>
+                        <option value="direct">Mentioned people only</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label [for]="'lang-' + s.channel.id">Language</label>
+                      <input class="input" [id]="'lang-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'language')" (ngModelChange)="setOption(s.channel.id, 'language', $event)" placeholder="en" maxlength="5" />
+                    </div>
+                    <div class="field full">
+                      <label [for]="'cw-' + s.channel.id">Content warning</label>
+                      <input class="input" [id]="'cw-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'spoiler_text')" (ngModelChange)="setOption(s.channel.id, 'spoiler_text', $event)" placeholder="Optional — hides the text behind this warning" />
+                    </div>
+                  </div>
+                </fieldset>
+              } @else if (s.channel.provider === 'bluesky') {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>Bluesky options</legend>
+                  <div class="field">
+                    <label [for]="'langs-' + s.channel.id">Languages</label>
+                    <input class="input" [id]="'langs-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'langs')" (change)="setListOption(s.channel.id, 'langs', $any($event.target).value)" placeholder="en, it" />
+                    <span class="hint">Comma-separated language codes</span>
+                  </div>
+                </fieldset>
+              } @else if (s.channel.provider === 'telegram') {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>Telegram options</legend>
+                  <div class="stack-sm">
+                    <label class="checkbox">
+                      <input type="checkbox" [ngModel]="optionFlag(s.channel.id, 'silent')" (ngModelChange)="setOption(s.channel.id, 'silent', $event || null)" />
+                      Send silently <span class="muted small">— subscribers get no sound</span>
+                    </label>
+                    <label class="checkbox">
+                      <input type="checkbox" [ngModel]="optionFlag(s.channel.id, 'pin')" (ngModelChange)="setOption(s.channel.id, 'pin', $event || null)" />
+                      Pin the message <span class="muted small">— the bot needs the "Pin messages" right</span>
+                    </label>
+                    <label class="checkbox">
+                      <input type="checkbox" [ngModel]="optionFlag(s.channel.id, 'disable_link_preview')" (ngModelChange)="setOption(s.channel.id, 'disable_link_preview', $event || null)" />
+                      No link preview
+                    </label>
+                    <label class="checkbox">
+                      <input type="checkbox" [ngModel]="optionFlag(s.channel.id, 'protect_content')" (ngModelChange)="setOption(s.channel.id, 'protect_content', $event || null)" />
+                      Protect content <span class="muted small">— no forwarding or saving</span>
+                    </label>
+                    <span class="hint">Captions on photos and videos are limited to 1,024 characters; longer text is sent as a follow-up message.</span>
+                  </div>
+                </fieldset>
+              }
+
+              @if (s.firstComment; as fc) {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>First comment</legend>
+                  <div class="stack">
+                    <div class="field">
+                      <div class="row">
+                        <label [for]="'fc-' + s.channel.id">Comment posted right after the publication</label>
+                        <span class="spacer"></span>
+                        <app-char-counter [count]="fc.count" [max]="fc.max" />
+                      </div>
+                      <textarea
+                        class="textarea"
+                        rows="3"
+                        [id]="'fc-' + s.channel.id"
+                        [ngModel]="optionString(s.channel.id, 'first_comment')"
+                        (ngModelChange)="setOption(s.channel.id, 'first_comment', $event)"
+                        placeholder="Optional — e.g. the link, extra context or a question to start the conversation"
+                      ></textarea>
+                    </div>
+                    <div class="field">
+                      <span class="label" [id]="'fcl-' + s.channel.id">Move links to the first comment</span>
+                      <div class="segmented" role="radiogroup" [attr.aria-labelledby]="'fcl-' + s.channel.id">
+                        <button type="button" role="radio" [attr.aria-checked]="fc.override === undefined" [class.active]="fc.override === undefined" (click)="setOption(s.channel.id, 'links_in_first_comment', null)">
+                          Channel default ({{ fc.channelDefault ? 'on' : 'off' }})
+                        </button>
+                        <button type="button" role="radio" [attr.aria-checked]="fc.override === true" [class.active]="fc.override === true" (click)="setOption(s.channel.id, 'links_in_first_comment', true)">On</button>
+                        <button type="button" role="radio" [attr.aria-checked]="fc.override === false" [class.active]="fc.override === false" (click)="setOption(s.channel.id, 'links_in_first_comment', false)">Off</button>
+                      </div>
+                      <span class="hint">
+                        LinkedIn shows posts with links to fewer people; put links in the first comment instead.
+                        @if (fc.moved) {
+                          Links are removed from the post (and the link card is dropped); the character count uses the text without them.
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </fieldset>
+              }
+
+              @if (s.problems.length && !s.locked) {
+                <ul class="problems list-reset" aria-live="polite">
+                  @for (p of s.problems; track p) {
+                    <li><app-icon name="alert" [size]="14" /> {{ p }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          } @else {
+            <!-- Shared content -->
+            <div class="stack tab-panel" role="tabpanel">
+              @if (anyBlog() || title()) {
+                <div class="field">
+                  <label for="title">{{ titleLabel() }} @if (anyBlog()) {<span class="muted">(required for {{ titleLabel() === 'Email subject' ? 'newsletters' : 'some channels' }})</span>}</label>
+                  <input id="title" class="input title-input" [(ngModel)]="title" placeholder="A headline for blog posts" />
+                </div>
+              }
+              <div class="field">
+                <label for="body" class="sr-only">Text</label>
+                <textarea
+                  id="body"
+                  class="textarea body-input main"
+                  rows="9"
+                  [(ngModel)]="body"
+                  placeholder="What do you want to share?"
+                  aria-describedby="counters"
+                ></textarea>
+              </div>
+              @if (states().length) {
+                <div class="counters" id="counters" aria-label="Character counts per channel">
+                  @for (s of states(); track s.channel.id) {
+                    <button
+                      type="button"
+                      class="counter"
+                      [class.bad]="s.max && s.count > s.max"
+                      [class.custom]="s.customized"
+                      (click)="tab.set(s.channel.id)"
+                      [attr.title]="s.channel.name + (s.customized ? ' (custom copy)' : '')"
+                    >
+                      <app-provider-icon [provider]="s.channel.provider" [size]="16" />
+                      <app-char-counter [count]="s.count" [max]="s.max" />
+                    </button>
+                  }
+                </div>
+              } @else {
+                <p class="hint muted small">Select channels above to see per-network limits.</p>
+              }
+
+              <!-- Media -->
+              <div
+                class="dropzone"
+                [class.over]="dragOver()"
+                (dragover)="onDragOver($event)"
+                (dragleave)="dragOver.set(false)"
+                (drop)="onDrop($event)"
+              >
+                @if (media().length || uploading().length) {
+                  <ul class="thumbs list-reset" aria-label="Attached media (drag to reorder)">
+                    @for (m of media(); track m.id; let i = $index) {
+                      <li
+                        class="thumb"
+                        draggable="true"
+                        (dragstart)="thumbDragStart(i, $event)"
+                        (dragover)="$event.preventDefault()"
+                        (drop)="thumbDrop(i, $event)"
+                        (dragend)="thumbDragEnd()"
+                      >
+                        @if (m.mime.startsWith('video/')) {
+                          <div class="vid"><app-icon name="video" [size]="22" /></div>
+                        } @else {
+                          <img [src]="m.url" [alt]="m.alt_text || m.original_name" />
+                        }
+                        <span class="order">{{ i + 1 }}</span>
+                        @if (!m.alt_text && !m.mime.startsWith('video/')) {
+                          <span class="no-alt" title="No alt text">ALT</span>
+                        }
+                        <div class="thumb-actions">
+                          <button type="button" class="ta" (click)="moveMedia(i, -1)" [disabled]="i === 0" [attr.aria-label]="'Move ' + m.original_name + ' left'"><app-icon name="chevronLeft" [size]="14" /></button>
+                          <button type="button" class="ta" (click)="editAlt(m)" [attr.aria-label]="'Edit alt text for ' + m.original_name"><app-icon name="edit" [size]="14" /></button>
+                          <button type="button" class="ta" (click)="removeMedia(m)" [attr.aria-label]="'Remove ' + m.original_name"><app-icon name="x" [size]="14" /></button>
+                          <button type="button" class="ta" (click)="moveMedia(i, 1)" [disabled]="i === media().length - 1" [attr.aria-label]="'Move ' + m.original_name + ' right'"><app-icon name="chevronRight" [size]="14" /></button>
+                        </div>
+                      </li>
+                    }
+                    @for (u of uploading(); track u.key) {
+                      <li class="thumb uploading" [attr.aria-label]="'Uploading ' + u.name"><span class="spinner"></span><span class="tiny truncate">{{ u.name }}</span></li>
+                    }
+                  </ul>
+                }
+                <label class="drop-label">
+                  <app-icon name="upload" [size]="18" />
+                  <span><strong>Add images or video</strong> — drop files here or browse</span>
+                  <span class="tiny muted">JPEG, PNG, GIF, WebP, MP4, MOV · up to {{ maxMediaAllowed() }} for the selected channels</span>
+                  <input type="file" class="sr-only" multiple accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime" (change)="onFiles($any($event.target).files); $any($event.target).value = ''" />
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <div class="field">
+                  <label for="link">Link</label>
+                  <input id="link" type="url" class="input" [(ngModel)]="link" placeholder="https://…" />
+                  <span class="hint">Used as a link card where the network supports it.</span>
+                </div>
+                <div class="field">
+                  <label for="campaign">Campaign</label>
+                  <select id="campaign" class="select" [(ngModel)]="campaign">
+                    <option [ngValue]="null">No campaign</option>
+                    @for (c of catalog.campaigns(); track c.id) {
+                      <option [ngValue]="c.id">{{ c.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="field full">
+                  <label for="tag-input">Tags</label>
+                  <div class="tag-box" (click)="tagEl.focus()">
+                    @for (t of tags(); track t) {
+                      <span class="chip accent">#{{ t }}<button type="button" class="tag-x" (click)="removeTag(t)" [attr.aria-label]="'Remove tag ' + t"><app-icon name="x" [size]="11" /></button></span>
+                    }
+                    <input #tagEl id="tag-input" class="tag-input" [(ngModel)]="tagInput" (keydown)="onTagKey($event)" (blur)="commitTag()" placeholder="Add a tag and press Enter" />
+                  </div>
+                </div>
+                @if (showNotes()) {
+                  <div class="field full">
+                    <label for="notes">Internal notes</label>
+                    <textarea id="notes" class="textarea" rows="2" [(ngModel)]="notes" placeholder="Only visible to your team"></textarea>
+                  </div>
+                } @else {
+                  <div class="full"><button type="button" class="link-btn small" (click)="showNotes.set(true)">+ Add internal notes</button></div>
+                }
+              </div>
+            </div>
+          }
+        </section>
+
+        <!-- Issues summary -->
+        @if (blockingProblems().length && (choice() !== 'draft' && choice() !== 'keep')) {
+          <div class="notice warning issues" role="status">
+            <app-icon name="alert" [size]="18" />
+            <div class="stack-sm">
+              <strong>Fix these before scheduling</strong>
+              @for (b of blockingProblems(); track b.channel.id) {
+                <div>
+                  <button type="button" class="link-btn" (click)="tab.set(b.channel.id)">{{ b.channel.name }}</button>: {{ b.problems.join(' ') }}
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Scheduling -->
+        <section class="card schedule" aria-labelledby="sched-h">
+          <div class="card-head">
+            <h2 id="sched-h">When</h2>
+            <span class="chip outline" title="Times are entered and shown in the workspace time zone"><app-icon name="globe" [size]="13" /> {{ tzLabel() }}</span>
+          </div>
+          <div class="modes" role="radiogroup" aria-label="Publishing mode">
+            @if (isScheduled()) {
+              <button type="button" role="radio" class="mode" [attr.aria-checked]="choice() === 'keep'" (click)="choice.set('keep')">
+                <app-icon name="check" [size]="16" /><span>Keep schedule</span>
+              </button>
+            }
+            <button type="button" role="radio" class="mode" [attr.aria-checked]="choice() === 'draft'" (click)="choice.set('draft')">
+              <app-icon name="edit" [size]="16" /><span>Draft</span>
+            </button>
+            <button type="button" role="radio" class="mode" [attr.aria-checked]="choice() === 'now'" (click)="choice.set('now')">
+              <app-icon name="zap" [size]="16" /><span>Now</span>
+            </button>
+            <button type="button" role="radio" class="mode" [attr.aria-checked]="choice() === 'exact'" (click)="choice.set('exact')">
+              <app-icon name="calendar" [size]="16" /><span>At a time</span>
+            </button>
+            <button type="button" role="radio" class="mode" [attr.aria-checked]="choice() === 'queue'" (click)="choice.set('queue')">
+              <app-icon name="queue" [size]="16" /><span>Queue</span>
+            </button>
+            <button type="button" role="radio" class="mode" [attr.aria-checked]="choice() === 'best_time'" (click)="choice.set('best_time')">
+              <app-icon name="target" [size]="16" /><span>Best time</span>
+            </button>
+            <button type="button" role="radio" class="mode" [attr.aria-checked]="choice() === 'suggest'" (click)="choice.set('suggest')">
+              <app-icon name="sparkles" [size]="16" /><span>Suggest times</span>
+            </button>
+          </div>
+
+          <div class="mode-body">
+            @switch (choice()) {
+              @case ('draft') {
+                <p class="muted small">Save without scheduling. You can schedule it later from here or the calendar.</p>
+              }
+              @case ('keep') {
+                <p class="muted small">Save your edits; every channel keeps its current scheduled time.</p>
+              }
+              @case ('now') {
+                <p class="muted small">Publishes to every selected channel right away.</p>
+              }
+              @case ('exact') {
+                <div class="field narrow">
+                  <label for="exact">Date and time ({{ tzLabel() }})</label>
+                  <input id="exact" type="datetime-local" class="input" [(ngModel)]="exactAt" />
+                  <span class="hint">All selected channels publish at this time.</span>
+                </div>
+              }
+              @case ('queue') {
+                <p class="muted small">Each channel takes its next free queue slot (configured in Settings → Queue).</p>
+                <div class="field narrow">
+                  <label for="q-after">Not before (optional)</label>
+                  <input id="q-after" type="datetime-local" class="input" [(ngModel)]="windowStart" />
+                </div>
+              }
+              @default {
+                <p class="muted small">
+                  @if (choice() === 'best_time') {
+                    Markette picks the strongest free slot for each channel's audience, staggered across networks.
+                  } @else {
+                    Get per-channel suggestions{{ ws.aiEnabled() ? ' (AI-assisted)' : '' }} with the reasoning behind them, then adjust and schedule.
+                  }
+                </p>
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="w-start">Window start (optional)</label>
+                    <input id="w-start" type="datetime-local" class="input" [(ngModel)]="windowStart" />
+                  </div>
+                  <div class="field">
+                    <label for="w-end">Window end (optional)</label>
+                    <input id="w-end" type="datetime-local" class="input" [(ngModel)]="windowEnd" />
+                    <span class="hint">Defaults to the next 7 days.</span>
+                  </div>
+                </div>
+                @if (choice() === 'suggest') {
+                  <div class="row-wrap" style="margin-top: 12px">
+                    <button type="button" class="btn" [class.ai]="ws.aiEnabled()" (click)="runSuggest()" [disabled]="suggesting() || !selected().length">
+                      @if (suggesting()) {
+                        <span class="spinner"></span>
+                      } @else {
+                        <app-icon name="sparkles" [size]="16" />
+                      }
+                      {{ suggestions().length ? 'Suggest again' : 'Suggest times' }}
+                    </button>
+                    @if (suggesting()) {
+                      <span class="muted small">Looking at each channel's audience…</span>
+                    }
+                  </div>
+                  @if (suggestError()) {
+                    <div class="form-error" style="margin-top: 10px" role="alert">{{ suggestError() }}</div>
+                    <app-ai-quota-hint [message]="suggestError()" />
+                  }
+                  @if (suggestions().length) {
+                    @if (suggestSummary()) {
+                      <p class="summary">{{ suggestSummary() }}</p>
+                      <app-ai-quota-hint [message]="suggestSummary()" />
+                    }
+                    <ul class="suggestions list-reset">
+                      @for (s of suggestions(); track s.channel) {
+                        <li class="sugg">
+                          <app-channel-badge [channel]="catalog.channel(s.channel)" [size]="28" [showHandle]="false" />
+                          <input
+                            type="datetime-local"
+                            class="input sm"
+                            [ngModel]="toLocal(s.scheduled_at)"
+                            (ngModelChange)="setSuggestionTime(s, $event)"
+                            [attr.aria-label]="'Time for ' + (catalog.channel(s.channel)?.name ?? 'channel')"
+                          />
+                          <span class="chip" [class.coral]="s.source === 'ai'" [class.info]="s.source === 'engine'">
+                            {{ s.source === 'ai' ? 'AI' : 'Best-time engine' }}
+                          </span>
+                          <p class="why small muted">{{ s.rationale }}</p>
+                        </li>
+                      }
+                    </ul>
+                  }
+                }
+              }
+            }
+          </div>
+
+          @if (requiresReview()) {
+            <div class="review-box">
+              <div class="row-wrap">
+                <app-icon name="users" [size]="16" />
+                <strong class="small">Needs approval</strong>
+                <span class="muted small">
+                  {{ reviewChannels().length === 1 ? reviewChannels()[0].channel.name + ' requires' : reviewChannels().length + ' channels require' }}
+                  a reviewer's approval before anything is scheduled. Your chosen timing is applied when they approve.
+                </span>
+              </div>
+              <div class="field">
+                <label for="review-comment">Note for the reviewer (optional)</label>
+                <textarea id="review-comment" class="textarea" rows="2" [(ngModel)]="reviewComment" placeholder="Context, deadlines, anything they should know"></textarea>
+              </div>
+            </div>
+          }
+
+          @if (formError()) {
+            <div class="form-error" role="alert">{{ formError() }}</div>
+          }
+
+          <div class="submit-row">
+            @if (choice() !== 'draft' && choice() !== 'keep') {
+              <button type="button" class="btn" (click)="choice.set('draft'); submit()" [disabled]="saving()">Save as draft</button>
+            }
+            <span class="spacer"></span>
+            <button type="button" class="btn primary lg" (click)="submit()" [disabled]="saving() || (choice() === 'suggest' && !suggestions().length)">
+              @if (saving()) {
+                <span class="spinner"></span>
+              } @else {
+                <app-icon [name]="requiresReview() ? 'users' : choice() === 'now' ? 'send' : choice() === 'draft' || choice() === 'keep' ? 'check' : 'calendar'" [size]="17" />
+              }
+              {{ primaryLabel() }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ===================== Preview column ===================== -->
+      <button type="button" class="btn block preview-toggle" (click)="showPreview.set(!showPreview())" [attr.aria-expanded]="showPreview()">
+        <app-icon name="eye" [size]="16" /> {{ showPreview() ? 'Hide preview' : 'Show preview' }}
+      </button>
+      <aside class="preview-col" aria-label="Preview" [class.collapsed]="!showPreview()">
+        <div class="preview-sticky">
+          <div class="row" style="margin-bottom: 10px">
+            <h2 class="h-small">Preview</h2>
+            <span class="spacer"></span>
+          </div>
+          @if (states().length) {
+            <div class="preview-picker" role="tablist" aria-label="Preview channel">
+              @for (s of states(); track s.channel.id) {
+                <button
+                  type="button"
+                  role="tab"
+                  class="pp"
+                  [attr.aria-selected]="previewId() === s.channel.id"
+                  (click)="previewFor.set(s.channel.id)"
+                  [attr.aria-label]="s.channel.name"
+                  [attr.title]="s.channel.name"
+                >
+                  <app-avatar [src]="s.channel.avatar_url" [name]="s.channel.name" [provider]="s.channel.provider" [size]="30" />
+                  @if (s.problems.length && !s.locked) {
+                    <span class="pp-warn" aria-hidden="true">!</span>
+                  }
+                </button>
+              }
+            </div>
+            @if (previewState(); as s) {
+              @if (s.isNewsletter || s.channel.provider === 'youtube' || s.channel.provider === 'discord') {
+                <app-special-preview
+                  [channel]="s.channel"
+                  [body]="s.body"
+                  [title]="s.title"
+                  [link]="link()"
+                  [media]="media()"
+                  [preheader]="optionString(s.channel.id, 'preheader')"
+                  [forum]="s.forumThread"
+                />
+              } @else {
+              <app-compose-preview
+                [channel]="s.channel"
+                [body]="s.firstComment ? s.firstComment.text : s.body"
+                [title]="s.title"
+                [link]="s.firstComment ? s.firstComment.link : link()"
+                [firstComment]="s.firstComment?.comment ?? ''"
+                [media]="media()"
+                [maxMedia]="s.provider?.max_media ?? 4"
+              />
+              }
+              <div class="preview-meta">
+                <app-char-counter [count]="s.count" [max]="s.max" />
+                <span class="muted small">{{ s.provider?.label }} · {{ s.max ? s.max + ' character limit' : 'no length limit' }}</span>
+              </div>
+              @if (s.problems.length && !s.locked) {
+                <ul class="problems list-reset">
+                  @for (p of s.problems; track p) {
+                    <li><app-icon name="alert" [size]="14" /> {{ p }}</li>
+                  }
+                </ul>
+              } @else if (!s.locked) {
+                <p class="ok small"><app-icon name="check" [size]="14" /> Ready for {{ s.provider?.label || s.channel.provider_label }}</p>
+              }
+            }
+          } @else {
+            <div class="preview-empty">
+              <app-icon name="eye" [size]="22" />
+              <p>Pick a channel to see how your post will look there.</p>
+            </div>
+          }
+        </div>
+      </aside>
+    </div>
+  }
+</div>
+
+<!-- Alt text -->
+<app-modal [open]="!!altEditing()" title="Alt text" subtitle="Describe the image for people using screen readers." size="sm" (closed)="altEditing.set(null)">
+  @if (altEditing(); as m) {
+    <div class="stack">
+      <img [src]="m.url" alt="" class="alt-preview" />
+      <div class="field">
+        <label for="alt">Description</label>
+        <textarea id="alt" class="textarea" rows="3" [(ngModel)]="altText" maxlength="1500"></textarea>
+        <span class="hint">{{ m.original_name }} · {{ fmtBytes(m.size) }}
+          @if (m.width) {
+            <span> · {{ m.width }}×{{ m.height }}</span>
+          }
+        </span>
+      </div>
+    </div>
+  }
+  <div modal-footer>
+    <button type="button" class="btn" (click)="altEditing.set(null)">Cancel</button>
+    <button type="button" class="btn primary" (click)="saveAlt()" [disabled]="altSaving()">
+      @if (altSaving()) {
+        <span class="spinner"></span>
+      }
+      Save
+    </button>
+  </div>
+</app-modal>
+
+<!-- AI adapt -->
+<app-modal [open]="adaptOpen()" title="Adapt for each network" subtitle="AI rewrites your shared text to fit each network's length, tone and conventions." size="lg" (closed)="adaptOpen.set(false)">
+  <div class="stack">
+    <div class="field">
+      <label for="adapt-instr">Extra instructions (optional)</label>
+      <div class="row">
+        <input id="adapt-instr" class="input" [(ngModel)]="adaptInstructions" placeholder="e.g. playful tone, max 2 hashtags, keep the emoji" />
+        <button type="button" class="btn" (click)="runAdapt()" [disabled]="adapting()">
+          @if (adapting()) {
+            <span class="spinner"></span>
+          } @else {
+            <app-icon name="refresh" [size]="16" />
+          }
+          {{ variants().length ? 'Regenerate' : 'Generate' }}
+        </button>
+      </div>
+    </div>
+    @if (adaptError()) {
+      <div class="form-error" role="alert">{{ adaptError() }}</div>
+      <app-ai-quota-hint [message]="adaptError()" />
+    }
+    @if (adapting() && !variants().length) {
+      <div class="stack">
+        @for (s of states(); track s.channel.id) {
+          <div class="skeleton" style="height: 110px"></div>
+        }
+      </div>
+    }
+    @for (v of variants(); track v.channel) {
+      <article class="variant" [class.applied]="applied().has(v.channel)">
+        <div class="row-wrap">
+          <app-channel-badge [channel]="variantChannel(v.channel)" [size]="28" [showHandle]="false" />
+          <span class="spacer"></span>
+          @if (variantCount(v); as c) {
+            <app-char-counter [count]="c.count" [max]="c.max" />
+          }
+          @if (v.over_limit) {
+            <span class="chip danger">Over limit</span>
+          }
+          <button type="button" class="btn sm" [class.soft]="!applied().has(v.channel)" (click)="applyVariant(v)">
+            @if (applied().has(v.channel)) {
+              <app-icon name="check" [size]="14" /> Applied
+            } @else {
+              Apply
+            }
+          </button>
+        </div>
+        @if (v.title) {
+          <div class="strong">{{ v.title }}</div>
+        }
+        <p class="pre-wrap variant-body">{{ v.body }}</p>
+        @if (v.notes) {
+          <p class="notice accent small"><app-icon name="info" [size]="14" /> {{ v.notes }}</p>
+        }
+      </article>
+    }
+  </div>
+  <div modal-footer>
+    <button type="button" class="btn" (click)="adaptOpen.set(false)">Close</button>
+    <button type="button" class="btn primary" (click)="applyAllVariants()" [disabled]="!variants().length">Apply all</button>
+  </div>
+</app-modal>

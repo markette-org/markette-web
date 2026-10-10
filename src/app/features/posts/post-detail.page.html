@@ -1,0 +1,315 @@
+<div class="page">
+  <a routerLink="/posts" class="back small"><app-icon name="arrowLeft" [size]="14" /> All posts</a>
+
+  @if (loading()) {
+    <div class="stack" style="margin-top: 16px">
+      <div class="skeleton" style="height: 34px; width: 40%"></div>
+      <div class="skeleton" style="height: 160px"></div>
+      <div class="skeleton" style="height: 220px"></div>
+    </div>
+  } @else if (error()) {
+    <div class="card" style="margin-top: 16px">
+      <app-empty-state icon="alert" title="Could not load this post" [text]="error()">
+        <a routerLink="/posts" class="btn">Back to posts</a>
+      </app-empty-state>
+    </div>
+  } @else if (post(); as p) {
+    <header class="page-header">
+      <div style="min-width: 0">
+        <div class="row-wrap" style="margin-bottom: 8px">
+          <app-status-chip [status]="p.status" />
+          <app-approval-chip [status]="p.approval_status" />
+          @if (campaign(); as c) {
+            <a class="chip outline" [routerLink]="['/campaigns', c.id]"><span class="color-dot" [style.background]="c.color"></span>{{ c.name }}</a>
+          }
+        </div>
+        <h1 class="title">{{ p.title || 'Untitled post' }}</h1>
+        <p class="subtitle">
+          @if (p.author_name) {
+            By {{ p.author_name }} ·
+          }
+          created {{ p.created_at | tzDate: 'datetime' }} · updated {{ p.updated_at | relTime }}
+        </p>
+      </div>
+      <div class="actions">
+        @if (ws.canWrite()) {
+          @if (hasFailed()) {
+            <button type="button" class="btn" (click)="retry()" [disabled]="busy()"><app-icon name="refresh" [size]="16" /> Retry failed</button>
+          }
+          @if (p.status === 'scheduled') {
+            <button type="button" class="btn" (click)="unschedule()" [disabled]="busy()"><app-icon name="pause" [size]="16" /> Unschedule</button>
+          }
+          <button type="button" class="btn" (click)="duplicate()" [disabled]="busy()"><app-icon name="copy" [size]="16" /> Duplicate</button>
+          <button type="button" class="btn danger-ghost" (click)="remove()" [disabled]="busy()"><app-icon name="trash" [size]="16" /> Delete</button>
+          @if (editable()) {
+            <a class="btn primary" [routerLink]="['/posts', p.id, 'edit']"><app-icon name="edit" [size]="16" /> Edit</a>
+          }
+        }
+      </div>
+    </header>
+
+    @if (problemCount()) {
+      <div class="notice warning" role="status" style="margin-bottom: 16px">
+        <app-icon name="alert" [size]="16" />
+        <div>
+          <strong>{{ problemCount() }} {{ problemCount() === 1 ? 'problem' : 'problems' }} would stop this post from publishing.</strong>
+          <span class="muted"> See the channel cards below.</span>
+          @if (editable()) {
+            <a [routerLink]="['/posts', p.id, 'edit']"> Fix in the editor</a>
+          }
+        </div>
+      </div>
+    }
+
+    @if (showApproval()) {
+      <div style="margin-bottom: 16px">
+        <app-approval-panel [post]="p" (changed)="onApprovalChanged($event)" />
+      </div>
+    }
+
+    @if (p.hidden_targets) {
+      <div class="notice" role="note" style="margin-bottom: 16px">
+        <app-icon name="lock" [size]="16" />
+        <span>{{ p.hidden_targets }} more {{ p.hidden_targets === 1 ? 'channel' : 'channels' }} managed by other teams — not shown here and left untouched when you edit.</span>
+      </div>
+    }
+
+    <div class="layout">
+      <section class="card content" aria-labelledby="content-h">
+        <div class="card-head"><h2 id="content-h">Content</h2></div>
+        @if (p.body) {
+          <p class="pre-wrap body">{{ p.body }}</p>
+        } @else {
+          <p class="muted">No shared text; each channel uses its own copy.</p>
+        }
+        @if (p.media.length) {
+          <div class="media">
+            @for (m of p.media; track m.id) {
+              <figure>
+                @if (m.mime.startsWith('video/')) {
+                  <video [src]="m.url" controls preload="metadata"></video>
+                } @else {
+                  <img [src]="m.url" [alt]="m.alt_text" loading="lazy" />
+                }
+                <figcaption class="tiny muted truncate" [attr.title]="m.alt_text || m.original_name">
+                  {{ m.alt_text || m.original_name }} · {{ fmtBytes(m.size) }}
+                </figcaption>
+              </figure>
+            }
+          </div>
+        }
+        <dl class="facts">
+          @if (p.link) {
+            <dt>Link</dt>
+            <dd><a [href]="p.link" target="_blank" rel="noopener" class="truncate">{{ p.link }}</a></dd>
+          }
+          @if (p.tags.length) {
+            <dt>Tags</dt>
+            <dd class="row-wrap">
+              @for (t of p.tags; track t) {
+                <span class="chip">#{{ t }}</span>
+              }
+            </dd>
+          }
+          <dt>Scheduling</dt>
+          <dd>
+            {{ modeLabel[p.schedule_mode] || p.schedule_mode }}
+            @if (p.window_start || p.window_end) {
+              <span class="muted">· window {{ p.window_start | tzDate: 'short' }} → {{ p.window_end | tzDate: 'short' }}</span>
+            }
+          </dd>
+          @if (p.notes) {
+            <dt>Notes</dt>
+            <dd class="pre-wrap">{{ p.notes }}</dd>
+          }
+        </dl>
+      </section>
+
+      <aside class="card summary" aria-label="Performance summary">
+        <div class="card-head"><h2>Performance</h2></div>
+        @if (totals(); as tot) {
+          @if (tot.hasMetrics) {
+            <div class="kpi">
+              <span class="kpi-label"><app-icon name="heart" [size]="14" /> Engagements</span>
+              <span class="kpi-value">{{ tot.engagements | num }}</span>
+            </div>
+            <div class="kpi" style="margin-top: 14px">
+              <span class="kpi-label"><app-icon name="eye" [size]="14" /> Impressions</span>
+              <span class="kpi-value">{{ tot.impressions | num }}</span>
+            </div>
+          } @else {
+            <p class="muted small">Metrics appear here once the post is published and the networks report them.</p>
+          }
+        }
+        <div class="divider"></div>
+        <div class="stack-sm small">
+          <span class="muted">{{ p.targets.length }} {{ p.targets.length === 1 ? 'channel' : 'channels' }}</span>
+          @for (t of p.targets; track t.id) {
+            <div class="row"><app-status-chip [status]="t.status" /> <span class="truncate">{{ t.channel_detail.name }}</span></div>
+          }
+        </div>
+      </aside>
+    </div>
+
+    <h2 class="section-h">Publications</h2>
+    @if (!p.targets.length) {
+      <div class="card">
+        <app-empty-state icon="channels" title="No channels selected" text="Edit the post and pick where it should go.">
+          @if (editable()) {
+            <a class="btn primary" [routerLink]="['/posts', p.id, 'edit']">Choose channels</a>
+          }
+        </app-empty-state>
+      </div>
+    }
+    <div class="targets">
+      @for (t of p.targets; track t.id) {
+        <article class="card target" [style.--c]="t.channel_detail.color || null">
+          <header class="t-head">
+            <app-channel-badge [channel]="t.channel_detail" [size]="36" />
+            <div class="spacer"></div>
+            <app-status-chip [status]="t.status" />
+          </header>
+
+          <dl class="facts">
+            @if (t.scheduled_at) {
+              <dt>Scheduled</dt>
+              <dd>{{ t.scheduled_at | tzDate: 'full' }}</dd>
+            }
+            @if (t.schedule_reason) {
+              <dt>Why</dt>
+              <dd>{{ t.schedule_reason }}</dd>
+            }
+            @if (t.published_at) {
+              <dt>Published</dt>
+              <dd>{{ t.published_at | tzDate: 'full' }}</dd>
+            }
+            @if (t.attempts) {
+              <dt>Attempts</dt>
+              <dd>
+                {{ t.attempts }}
+                @if (t.next_attempt_at) {
+                  <span class="muted">· next try {{ t.next_attempt_at | relTime }}</span>
+                }
+              </dd>
+            }
+            @for (o of optionEntries(t); track o.key) {
+              <dt class="cap">{{ o.key }}</dt>
+              <dd>{{ o.value }}</dd>
+            }
+          </dl>
+
+          @if (t.title && t.title !== p.title) {
+            <p class="strong small">{{ t.title }}</p>
+          }
+          @if (t.body && t.body !== p.body) {
+            <p class="pre-wrap override small">{{ t.body }}</p>
+          }
+
+          @if (t.options.first_comment || t.options.links_in_first_comment || t.extra?.first_comment_id) {
+            <div class="first-comment small">
+              <div class="row-wrap">
+                <app-icon name="message" [size]="14" />
+                <strong>First comment</strong>
+                @if (t.extra?.first_comment_id) {
+                  <span class="chip success"><app-icon name="check" [size]="12" /> First comment posted</span>
+                }
+                @if (t.options.links_in_first_comment) {
+                  <span class="chip outline">Links moved to first comment</span>
+                }
+              </div>
+              @if (t.options.first_comment) {
+                <p class="pre-wrap muted">{{ t.options.first_comment }}</p>
+              }
+            </div>
+          }
+
+          @if (extraChips(t).length) {
+            <div class="row-wrap">
+              @for (c of extraChips(t); track c.label) {
+                <span class="chip {{ c.cls }}">{{ c.label }}</span>
+              }
+            </div>
+          }
+          @if (extraNote(t)) {
+            <div class="notice warning small" role="status"><app-icon name="info" [size]="16" /><span>{{ extraNote(t) }}</span></div>
+          }
+
+          @if (t.last_error) {
+            @if (isSoftError(t)) {
+              <div class="notice warning small" role="status"><app-icon name="alert" [size]="16" /><span class="pre-wrap">{{ t.last_error }}</span></div>
+            } @else {
+              <div class="notice danger small" role="alert"><app-icon name="alert" [size]="16" /><span class="pre-wrap">{{ t.last_error }}</span></div>
+            }
+          }
+          @for (prob of targetProblems(t); track prob) {
+            <div class="notice warning small"><app-icon name="alert" [size]="16" />{{ prob }}</div>
+          }
+
+          @if (sendStats(t); as st) {
+            <p class="small muted send-stats">
+              <app-icon name="send" [size]="14" /> Sent to {{ st.sent | num }} {{ st.sent === 1 ? 'subscriber' : 'subscribers' }}
+              @if (st.failed) {
+                · <span class="warning-text">{{ st.failed | num }} failed</span>
+              }
+            </p>
+          }
+          @if (metricTiles(t.metrics).length) {
+            <div class="metrics">
+              @for (m of metricTiles(t.metrics); track m.key) {
+                <div class="metric">
+                  <span class="tiny muted cap">{{ metricLabel(t, m.key) }}</span>
+                  <strong class="tabular">{{ m.value | num }}</strong>
+                </div>
+              }
+              @if (t.metrics.engagement_rate !== null && t.metrics.engagement_rate !== undefined) {
+                <div class="metric">
+                  <span class="tiny muted">Eng. rate</span>
+                  <strong class="tabular">{{ t.metrics.engagement_rate | pct }}</strong>
+                </div>
+              }
+            </div>
+          }
+
+          @if (t.status === 'published' && measurable(t)) {
+            <div class="charts">
+              <div>
+                <h3 class="chart-h">Engagements over time</h3>
+                <app-line-chart [series]="series(t, 'engagements')" [xFormat]="xFormat" label="Engagements over time" emptyText="No snapshots yet" style="--chart-h: 110px" />
+              </div>
+              <div>
+                <h3 class="chart-h">{{ metricLabel(t, 'impressions') }} over time</h3>
+                <app-line-chart [series]="series(t, 'impressions')" [xFormat]="xFormat" [label]="metricLabel(t, 'impressions') + ' over time'" emptyText="No snapshots yet" style="--chart-h: 110px" />
+              </div>
+            </div>
+            @if (t.metrics_updated_at) {
+              <p class="tiny muted">Metrics updated {{ t.metrics_updated_at | relTime }}</p>
+            }
+          }
+
+          <footer class="t-foot">
+            @if (t.external_url) {
+              <a class="btn sm" [href]="t.external_url" target="_blank" rel="noopener"><app-icon name="external" [size]="14" /> View on {{ t.channel_detail.provider_label }}</a>
+            }
+            @if (t.status === 'published' && measurable(t)) {
+              <button type="button" class="btn sm ghost" (click)="refreshMetrics(t)" [disabled]="refreshing() === t.id">
+                @if (refreshing() === t.id) {
+                  <span class="spinner"></span>
+                } @else {
+                  <app-icon name="refresh" [size]="14" />
+                }
+                Refresh metrics
+              </button>
+            }
+            <div class="spacer"></div>
+            @if (canCancel(t)) {
+              <button type="button" class="btn sm danger-ghost" (click)="cancelTarget(t)">Cancel publication</button>
+            }
+            @if (canDeleteRemote(t)) {
+              <button type="button" class="btn sm danger-ghost" (click)="deleteRemote(t)"><app-icon name="trash" [size]="14" /> Delete from network</button>
+            }
+          </footer>
+        </article>
+      }
+    </div>
+  }
+</div>

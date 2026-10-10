@@ -1,0 +1,354 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <div class="eyebrow">Organization</div>
+      <h1>{{ org()?.name || 'Organizations' }}</h1>
+      <p class="subtitle">
+        {{ isAdmin() ? 'Plan usage, workspaces and the people who can access them.' : 'The organizations you belong to and your access in each.' }}
+      </p>
+    </div>
+    <div class="actions">
+      @if (ws.organizations().length > 1) {
+        <label for="org-pick" class="sr-only">Organization</label>
+        <select id="org-pick" class="select" style="min-width: 240px" [ngModel]="orgId()" (ngModelChange)="selectOrg($event)">
+          @for (o of ws.organizations(); track o.id) {
+            <option [ngValue]="o.id">{{ o.name }} · {{ o.role ? roleLabel[o.role] : 'Workspace access' }}</option>
+          }
+        </select>
+      }
+      @if (canCreateOrg()) {
+        <button type="button" class="btn" (click)="newOrgOpen.set(true)"><app-icon name="plus" [size]="16" /> New organization</button>
+      }
+    </div>
+  </header>
+
+  @if (org(); as o) {
+    @if (o.status === 'suspended') {
+      <div class="notice danger" role="alert" style="margin-bottom: 16px">
+        <app-icon name="lock" [size]="18" />
+        <span><strong>This organization is suspended.</strong> Its workspaces are paused and nothing is published. Contact support to reactivate it.</span>
+      </div>
+    }
+
+    @if (isAdmin()) {
+    <div>
+      <!-- General -->
+      <section class="card" aria-labelledby="gen-h">
+        <div class="card-head"><h2 id="gen-h">General</h2><span class="chip">Your role: {{ o.role }}</span></div>
+        <form class="stack" (ngSubmit)="saveName()">
+          <div class="field">
+            <label for="org-name">Name</label>
+            <div class="row">
+              <input id="org-name" name="name" class="input" [ngModel]="name()" (ngModelChange)="name.set($event)" />
+              <button type="submit" class="btn primary" [disabled]="savingName() || name().trim() === o.name">
+                @if (savingName()) {
+                  <span class="spinner"></span>
+                }
+                Save
+              </button>
+            </div>
+            @if (nameError()) {
+              <span class="error">{{ nameError() }}</span>
+            }
+          </div>
+          <div class="muted small">Identifier: <code>{{ o.slug }}</code></div>
+        </form>
+      </section>
+
+    </div>
+    <div style="margin-top: 16px"><app-billing-card [orgId]="o.id" /></div>
+
+    <!-- Workspaces -->
+    <section class="card flush" style="margin-top: 16px" aria-labelledby="ws-h">
+      <div class="card-head pad">
+        <div>
+          <h2 id="ws-h">Workspaces</h2>
+          <p class="muted small">Archived workspaces are read-only and hidden from the switcher.</p>
+        </div>
+        <button type="button" class="btn primary sm" (click)="openNewWs()"><app-icon name="plus" [size]="14" /> New workspace</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Workspace</th>
+              <th>Time zone</th>
+              <th>Your role</th>
+              <th>Status</th>
+              <th><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (w of orgWorkspaces(); track w.id) {
+              <tr [class.archived]="w.is_archived">
+                <td>
+                  <span class="strong">{{ w.name }}</span>
+                  @if (w.slug === ws.slug()) {
+                    <span class="chip accent" style="margin-left: 6px; height: 20px">Current</span>
+                  }
+                </td>
+                <td class="muted small">{{ w.timezone }}</td>
+                <td><span class="chip">{{ w.role }}</span></td>
+                <td>
+                  @if (w.is_archived) {
+                    <span class="chip outline" [title]="w.archived_at ? 'Archived ' + (w.archived_at | tzDate) : ''">Archived</span>
+                  } @else {
+                    <span class="chip success"><span class="dot"></span>Active</span>
+                  }
+                </td>
+                <td class="actions-cell">
+                  @if (w.slug !== ws.slug()) {
+                    <button type="button" class="btn sm ghost" (click)="open(w)">Open</button>
+                  }
+                  @if (w.is_archived) {
+                    <button type="button" class="btn sm" (click)="setArchived(w, false)" [disabled]="busyWs() === w.id">Restore</button>
+                  } @else {
+                    <button type="button" class="btn sm danger-ghost" (click)="setArchived(w, true)" [disabled]="busyWs() === w.id">Archive</button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="muted">No workspaces in this organization yet.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div style="margin-top: 16px"><app-org-channels-card [orgId]="o.id" /></div>
+
+    <!-- Members -->
+    <section class="card flush" style="margin-top: 16px" aria-labelledby="mem-h">
+      <div class="card-head pad">
+        <div>
+          <h2 id="mem-h">Members</h2>
+          <p class="muted small">Owners and admins automatically have owner/admin access to every workspace. Members only see the workspaces they're added to.</p>
+        </div>
+        <span class="muted small">{{ members().length }} {{ members().length === 1 ? 'person' : 'people' }}</span>
+      </div>
+      @if (membersLoading()) {
+        <div class="pad"><div class="skeleton" style="height: 120px"></div></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Person</th>
+                <th>Organization role</th>
+                <th>Workspace access</th>
+                <th><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of members(); track m.id) {
+                <tr>
+                  <td>
+                    <span class="row">
+                      <app-avatar [name]="m.user.name || m.user.email" [size]="32" />
+                      <span class="stack-sm" style="gap: 0; min-width: 0">
+                        <span class="strong truncate">
+                          {{ m.user.name || m.user.email }}
+                          @if (m.user.id === auth.user()?.id) {
+                            <span class="chip accent" style="height: 18px; margin-left: 4px">You</span>
+                          }
+                        </span>
+                        <span class="muted tiny truncate">{{ m.user.email }}</span>
+                      </span>
+                    </span>
+                  </td>
+                  <td>
+                    @if (canEdit(m)) {
+                      <label class="sr-only" [for]="'orole-' + m.id">Role of {{ m.user.email }}</label>
+                      <select [id]="'orole-' + m.id" class="select sm" style="width: 120px" [ngModel]="m.role" (ngModelChange)="setRole(m, $event)" [title]="roleHelp[m.role]">
+                        @for (r of assignable(); track r) {
+                          <option [value]="r">{{ r }}</option>
+                        }
+                      </select>
+                    } @else {
+                      <span class="chip" [title]="roleHelp[m.role]">{{ m.role }}</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="row-wrap access">
+                      @if (m.role === 'owner' || m.role === 'admin') {
+                        <span class="chip accent">All workspaces · {{ m.role }}</span>
+                      }
+                      @for (a of m.workspaces; track a.id) {
+                        <span class="chip outline">{{ a.name }} · {{ a.role }}</span>
+                      } @empty {
+                        @if (m.role === 'member') {
+                          <span class="muted tiny">No workspace yet</span>
+                        }
+                      }
+                    </div>
+                  </td>
+                  <td class="actions-cell">
+                    @if (canEdit(m)) {
+                      <button type="button" class="btn sm danger-ghost" (click)="removeMember(m)">{{ m.user.id === auth.user()?.id ? 'Leave' : 'Remove' }}</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <!-- Invitations -->
+    <section class="card stack" style="margin-top: 16px" aria-labelledby="inv-h">
+      <div class="card-head" style="margin-bottom: 0">
+        <div>
+          <h2 id="inv-h">Invite to the organization</h2>
+          <p class="muted small">After joining, add members to workspaces from each workspace's Settings → Members.</p>
+        </div>
+      </div>
+      <form class="invite-form" (ngSubmit)="invite()">
+        <div class="field" style="flex: 1; min-width: 220px">
+          <label for="oinv-email">Email</label>
+          <input id="oinv-email" name="email" type="email" class="input" [ngModel]="invEmail()" (ngModelChange)="invEmail.set($event)" placeholder="colleague@company.com" />
+        </div>
+        <div class="field">
+          <label for="oinv-role">Organization role</label>
+          <select id="oinv-role" name="role" class="select" [ngModel]="invRole()" (ngModelChange)="invRole.set($event)">
+            @for (r of assignable(); track r) {
+              <option [value]="r">{{ r }}</option>
+            }
+          </select>
+        </div>
+        <button type="submit" class="btn primary" [disabled]="inviting()">
+          @if (inviting()) {
+            <span class="spinner"></span>
+          } @else {
+            <app-icon name="send" [size]="16" />
+          }
+          Create invite
+        </button>
+      </form>
+      <p class="hint muted tiny">{{ roleHelp[invRole()] }} No email is sent: share the invite link yourself.</p>
+      @if (invError()) {
+        <div class="form-error" role="alert">{{ invError() }}</div>
+      }
+      @if (invitations().length) {
+        <ul class="list-reset inv-list">
+          @for (i of invitations(); track i.id) {
+            <li [class.fresh]="i.id === lastInvite()">
+              <div class="stack-sm" style="gap: 2px; min-width: 0; flex: 1">
+                <span class="strong truncate">
+                  {{ i.email }}
+                  <span class="chip" style="height: 20px">{{ i.org_role || 'member' }}</span>
+                  @if (i.workspace_name) {
+                    <span class="chip outline" style="height: 20px">{{ i.workspace_name }} · {{ i.role }}</span>
+                  }
+                </span>
+                <code class="truncate link-text">{{ link(i) }}</code>
+              </div>
+              <span class="muted tiny">{{ i.created_at | relTime }}</span>
+              <button type="button" class="btn sm" (click)="copy(i)"><app-icon name="copy" [size]="14" /> Copy link</button>
+              <button type="button" class="btn danger-ghost sm" (click)="revoke(i)">Revoke</button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="muted small">No pending invitations.</p>
+      }
+    </section>
+
+    <div style="margin-top: 16px"><app-sso-card [org]="o" /></div>
+    } @else {
+      <div class="org-grid">
+        <section class="card" aria-labelledby="sum-h">
+          <div class="card-head">
+            <h2 id="sum-h">Your access</h2>
+            <span class="chip">{{ o.role ? roleLabel[o.role] : 'Workspace access only' }}</span>
+          </div>
+          <p class="muted small">
+            @if (o.role === 'member') {
+              You are a member of {{ o.name }}: you can open the workspaces you were added to. Administrators manage the plan, workspaces and people.
+            } @else {
+              You have access to some workspaces of {{ o.name }} without an organization role.
+            }
+          </p>
+          <ul class="list-reset ws-list">
+            @for (w of orgWorkspaces(); track w.id) {
+              <li class="row">
+                <span class="ws-dot">{{ w.name.charAt(0).toUpperCase() }}</span>
+                <span class="strong truncate" style="flex: 1">{{ w.name }}</span>
+                @if (w.is_archived) {
+                  <span class="chip outline">Archived</span>
+                }
+                <span class="chip">{{ w.role }}</span>
+                <button type="button" class="btn sm" (click)="ws.switchTo(w.slug)" [disabled]="w.slug === ws.slug()">
+                  {{ w.slug === ws.slug() ? 'Current' : 'Open' }}
+                </button>
+              </li>
+            } @empty {
+              <li class="muted small">No workspaces in this organization yet.</li>
+            }
+          </ul>
+        </section>
+      </div>
+    }
+
+    <section class="card leave-card" aria-labelledby="leave-h">
+      <div class="card-head"><h2 id="leave-h">Leave organization</h2></div>
+      <p class="muted small">
+        You lose your organization role and access to all of its workspaces and teams. Posts you wrote stay. An organization always needs at least one owner.
+      </p>
+      @if (leaveError()) {
+        <div class="form-error" role="alert">{{ leaveError() }}</div>
+      }
+      <div class="row" style="margin-top: 12px">
+        <button type="button" class="btn danger-ghost" (click)="leave(o)" [disabled]="leaving()">
+          @if (leaving()) {
+            <span class="spinner"></span>
+          } @else {
+            <app-icon name="logout" [size]="16" />
+          }
+          Leave {{ o.name }}
+        </button>
+      </div>
+    </section>
+  } @else {
+    <div class="card">
+      <div class="empty">
+        <h3>You are not in any organization</h3>
+        <p>Organizations hold workspaces, people and a plan.{{ canCreateOrg() ? ' Start one, or ask to be invited to an existing one.' : ' Ask to be invited to one.' }}</p>
+        @if (canCreateOrg()) {
+          <button type="button" class="btn primary" (click)="newOrgOpen.set(true)"><app-icon name="plus" [size]="16" /> New organization</button>
+        }
+      </div>
+    </div>
+  }
+</div>
+
+<app-modal [open]="newWsOpen()" title="New workspace" [subtitle]="'In ' + (org()?.name ?? '')" (closed)="newWsOpen.set(false)" [dismissible]="!creatingWs()">
+  <form id="org-new-ws" class="stack" (ngSubmit)="createWs()">
+    <div class="field">
+      <label for="nws-name">Name</label>
+      <input id="nws-name" name="name" class="input" [ngModel]="newWsName()" (ngModelChange)="newWsName.set($event)" placeholder="Acme Coffee" />
+    </div>
+    <div class="field">
+      <label for="nws-tz">Time zone</label>
+      <select id="nws-tz" name="tz" class="select" [ngModel]="newWsTz()" (ngModelChange)="newWsTz.set($event)">
+        @for (tz of timezones; track tz) {
+          <option [value]="tz">{{ tz }}</option>
+        }
+      </select>
+    </div>
+    @if (newWsError()) {
+      <div class="form-error" role="alert">{{ newWsError() }}</div>
+    }
+  </form>
+  <div modal-footer>
+    <button type="button" class="btn" (click)="newWsOpen.set(false)">Cancel</button>
+    <button type="submit" form="org-new-ws" class="btn primary" [disabled]="creatingWs()">
+      @if (creatingWs()) {
+        <span class="spinner"></span>
+      }
+      Create workspace
+    </button>
+  </div>
+</app-modal>
+
+<app-new-org-dialog [open]="newOrgOpen()" (closed)="newOrgOpen.set(false)" />

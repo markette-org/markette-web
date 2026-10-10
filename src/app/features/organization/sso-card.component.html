@@ -1,0 +1,263 @@
+<section class="card" aria-labelledby="sso-h">
+  <div class="card-head">
+    <div>
+      <h2 id="sso-h">Single sign-on</h2>
+      <p class="muted small">Let people sign in with your company identity provider (OpenID Connect).</p>
+    </div>
+    @if (isOwner() && cfg(); as c) {
+      <div class="row-wrap">
+        @if (c.enabled) {
+          <span class="chip success"><span class="dot"></span>Enabled</span>
+        } @else {
+          <span class="chip"><span class="dot"></span>Disabled</span>
+        }
+        @if (c.enforce) {
+          <span class="chip warning"><app-icon name="lock" [size]="12" /> Enforced</span>
+        }
+        @if (dirty()) {
+          <span class="chip warning"><span class="dot"></span>Unsaved changes</span>
+        }
+      </div>
+    }
+  </div>
+
+  @if (!isOwner()) {
+    <p class="notice"><app-icon name="lock" [size]="16" /> Single sign-on is managed by the organization owners.</p>
+  } @else if (loading() && !cfg()) {
+    <div class="skeleton" style="height: 140px"></div>
+  } @else if (loadError()) {
+    <div class="form-error" role="alert">{{ loadError() }}</div>
+  } @else if (cfg(); as c) {
+    @if (draft(); as d) {
+      <div class="stack sso">
+        <!-- Enable -->
+        <div class="row-wrap enable-row">
+          <label class="switch">
+            <input type="checkbox" [checked]="d.enabled" (change)="set('enabled', $any($event.target).checked)" />
+            <span class="track"></span>
+            <span><strong>Enable single sign-on</strong> <span class="muted small">— checked against the issuer when you save</span></span>
+          </label>
+          <span class="spacer"></span>
+          @if (c.enabled && c.login_url) {
+            <a class="btn sm" [href]="c.login_url" target="_blank" rel="noopener"><app-icon name="external" [size]="14" /> Test sign-in</a>
+          }
+        </div>
+
+        <!-- Identity provider -->
+        <fieldset class="block">
+          <legend>1 · Identity provider</legend>
+          <div class="field">
+            <span class="label">Redirect URI</span>
+            <div class="row">
+              <code class="mono-box truncate">{{ c.redirect_uri }}</code>
+              <button type="button" class="btn sm" (click)="copy(c.redirect_uri, 'Redirect URI')"><app-icon name="copy" [size]="14" /> Copy</button>
+            </div>
+            <span class="hint">Register this redirect URI at your identity provider.</span>
+          </div>
+          <div class="form-grid">
+            <div class="field full">
+              <label for="sso-issuer">Issuer URL</label>
+              <input id="sso-issuer" class="input" type="url" [class.invalid]="fe()['issuer']" [ngModel]="d.issuer" (ngModelChange)="set('issuer', $event)" placeholder="https://accounts.google.com" autocomplete="off" />
+              @if (fe()['issuer']) {
+                <span class="error">{{ fe()['issuer'] }}</span>
+              }
+              <ul class="list-reset examples tiny muted">
+                @for (e of examples; track e.name) {
+                  <li><strong>{{ e.name }}</strong> <code>{{ e.url }}</code></li>
+                }
+              </ul>
+            </div>
+            <div class="field">
+              <label for="sso-client">Client ID</label>
+              <input id="sso-client" class="input" [class.invalid]="fe()['client_id']" [ngModel]="d.client_id" (ngModelChange)="set('client_id', $event)" autocomplete="off" />
+              @if (fe()['client_id']) {
+                <span class="error">{{ fe()['client_id'] }}</span>
+              }
+            </div>
+            <div class="field">
+              <div class="row">
+                <span class="label">Client secret</span>
+                <span class="chip" [class.success]="c.client_secret_set" style="height: 20px">{{ c.client_secret_set ? 'Set' : 'Not set' }}</span>
+              </div>
+              @if (secretEditing()) {
+                <div class="row">
+                  <input class="input" type="password" aria-label="New client secret" [ngModel]="secret()" (ngModelChange)="secret.set($event)" autocomplete="new-password" placeholder="Paste the client secret" />
+                  <button type="button" class="btn ghost sm" (click)="secretEditing.set(false); secret.set('')">Cancel</button>
+                </div>
+                <span class="hint">Stored encrypted and never shown again. Click Save to store it.</span>
+              } @else {
+                <div class="row-wrap">
+                  <button type="button" class="btn sm" (click)="secretEditing.set(true)"><app-icon name="edit" [size]="14" /> {{ c.client_secret_set ? 'Replace' : 'Set' }}</button>
+                  @if (c.client_secret_set) {
+                    <button type="button" class="btn danger-ghost sm" (click)="clearSecret()" [disabled]="saving()">Clear</button>
+                  }
+                </div>
+              }
+              @if (fe()['client_secret']) {
+                <span class="error">{{ fe()['client_secret'] }}</span>
+              }
+            </div>
+          </div>
+          <button type="button" class="link-btn small" (click)="showAdvanced.set(!showAdvanced())" [attr.aria-expanded]="showAdvanced()">
+            {{ showAdvanced() ? 'Hide advanced' : 'Advanced' }}
+          </button>
+          @if (showAdvanced()) {
+            <div class="field">
+              <label for="sso-scopes">Scopes</label>
+              <input id="sso-scopes" class="input" [ngModel]="d.scopes" (ngModelChange)="set('scopes', $event)" placeholder="openid email profile" />
+              <span class="hint">Space-separated. "openid email" is required to match people by email.</span>
+            </div>
+          }
+        </fieldset>
+
+        <!-- Domains -->
+        <fieldset class="block">
+          <legend>2 · Domains</legend>
+          @if (!c.configured) {
+            <p class="muted small">Save the identity provider first, then add the email domains that sign in with it.</p>
+          } @else {
+            <p class="muted small">People whose email is on a verified domain are offered SSO at sign-in. Prove ownership with a DNS TXT record.</p>
+            <ul class="list-reset domains">
+              @for (dm of c.domains; track dm.id) {
+                <li class="domain">
+                  <div class="row-wrap">
+                    <strong>{{ dm.domain }}</strong>
+                    @if (dm.verified) {
+                      <span class="chip success"><app-icon name="check" [size]="12" /> Verified{{ dm.verified_at ? ' ' + (dm.verified_at | relTime) : '' }}</span>
+                    } @else {
+                      <span class="chip warning">Not verified</span>
+                    }
+                    <span class="spacer"></span>
+                    @if (!dm.verified) {
+                      <button type="button" class="btn sm primary" (click)="verify(dm)" [disabled]="domainBusy() === dm.id">
+                        @if (domainBusy() === dm.id) {
+                          <span class="spinner"></span>
+                        }
+                        Verify
+                      </button>
+                    }
+                    <button type="button" class="btn danger-ghost sm" (click)="removeDomain(dm)" [disabled]="domainBusy() === dm.id">Remove</button>
+                  </div>
+                  @if (!dm.verified) {
+                    <div class="txt">
+                      <span class="tiny muted">Create this TXT record at your DNS provider:</span>
+                      <div class="row">
+                        <span class="tiny strong kv">Name</span>
+                        <code class="mono-box truncate">{{ dm.txt_name }}</code>
+                        <button type="button" class="btn sm icon" (click)="copy(dm.txt_name, 'Record name')" aria-label="Copy record name"><app-icon name="copy" [size]="14" /></button>
+                      </div>
+                      <div class="row">
+                        <span class="tiny strong kv">Value</span>
+                        <code class="mono-box truncate">{{ dm.txt_value }}</code>
+                        <button type="button" class="btn sm icon" (click)="copy(dm.txt_value, 'Record value')" aria-label="Copy record value"><app-icon name="copy" [size]="14" /></button>
+                      </div>
+                      <span class="tiny muted">DNS changes can take a few minutes to propagate.</span>
+                    </div>
+                  }
+                  @if (domainRowError()[dm.id]) {
+                    <div class="form-error small" role="alert">{{ domainRowError()[dm.id] }}</div>
+                  }
+                </li>
+              } @empty {
+                <li class="muted small">No domains yet.</li>
+              }
+            </ul>
+            <form class="row add-domain" (ngSubmit)="addDomain()">
+              <label for="sso-domain" class="sr-only">Domain</label>
+              <input id="sso-domain" name="domain" class="input" [ngModel]="newDomain()" (ngModelChange)="newDomain.set($event); domainError.set('')" placeholder="acme.com" autocomplete="off" />
+              <button type="submit" class="btn" [disabled]="addingDomain() || !newDomain().trim()">
+                @if (addingDomain()) {
+                  <span class="spinner"></span>
+                }
+                Add domain
+              </button>
+            </form>
+            @if (domainError()) {
+              <span class="error small">{{ domainError() }}</span>
+            }
+          }
+        </fieldset>
+
+        <!-- Provisioning -->
+        <fieldset class="block">
+          <legend>3 · Provisioning</legend>
+          <label class="switch">
+            <input type="checkbox" [checked]="d.auto_provision" (change)="set('auto_provision', $any($event.target).checked)" />
+            <span class="track"></span>
+            <span><strong>Create accounts automatically on first sign-in</strong> <span class="block-text muted small">Otherwise only people already in the organization can sign in with SSO.</span></span>
+          </label>
+          <div class="form-grid" style="margin-top: 12px">
+            <div class="field">
+              <label for="sso-role">Organization role for new people</label>
+              <select id="sso-role" class="select" [ngModel]="d.default_org_role" (ngModelChange)="set('default_org_role', $event)">
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+              @if (fe()['default_org_role']) {
+                <span class="error">{{ fe()['default_org_role'] }}</span>
+              }
+            </div>
+            <div class="field">
+              <label for="sso-ws">Add them to workspace</label>
+              <div class="row">
+                <select id="sso-ws" class="select" [ngModel]="d.default_workspace" (ngModelChange)="set('default_workspace', $event)">
+                  <option [ngValue]="null">None</option>
+                  @for (w of orgWorkspaces(); track w.id) {
+                    <option [ngValue]="w.id">{{ w.name }}</option>
+                  }
+                </select>
+                @if (d.default_workspace) {
+                  <select class="select" aria-label="Workspace role" style="max-width: 130px" [ngModel]="d.default_workspace_role" (ngModelChange)="set('default_workspace_role', $event)">
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                }
+              </div>
+              @if (fe()['default_workspace']) {
+                <span class="error">{{ fe()['default_workspace'] }}</span>
+              }
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Enforcement -->
+        <fieldset class="block" [class.enforce-on]="d.enforce">
+          <legend>4 · Enforcement</legend>
+          <label class="switch">
+            <input type="checkbox" [checked]="d.enforce" [disabled]="!canEnforce()" (change)="set('enforce', $any($event.target).checked)" />
+            <span class="track"></span>
+            <span><strong>Require SSO for everyone on these domains</strong></span>
+          </label>
+          @if (!canEnforce()) {
+            <span class="hint">Enable SSO and verify at least one domain to turn this on.</span>
+          }
+          <div class="notice warning small" style="margin-top: 10px">
+            <app-icon name="alert" [size]="16" />
+            <span>
+              People on these domains can no longer sign in with a password. Superadmins keep password access, and personal API tokens keep working.
+            </span>
+          </div>
+          @if (fe()['enforce']) {
+            <span class="error">{{ fe()['enforce'] }}</span>
+          }
+        </fieldset>
+
+        @if (general()) {
+          <div class="form-error" role="alert">{{ general() }}</div>
+        }
+        <div class="foot">
+          @if (dirty()) {
+            <button type="button" class="btn ghost" (click)="discard()" [disabled]="saving()">Discard</button>
+          }
+          <button type="button" class="btn primary" (click)="save()" [disabled]="saving() || (!dirty() && c.configured)">
+            @if (saving()) {
+              <span class="spinner"></span>
+            }
+            Save single sign-on
+          </button>
+        </div>
+      </div>
+    }
+  }
+</section>

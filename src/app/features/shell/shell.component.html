@@ -1,0 +1,280 @@
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="shell" [class.open]="sidebarOpen()">
+  <aside class="sidebar" aria-label="Main navigation">
+    <a routerLink="/" class="brand" [attr.aria-label]="platform.instanceName() + ' home'">
+      <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="16" fill="var(--accent)" />
+        <path d="M16 46V20l16 15 16-15v26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="48" cy="46" r="5" fill="var(--coral)" />
+      </svg>
+      <span class="truncate">{{ platform.instanceName() }}</span>
+    </a>
+
+    @if (ws.canWrite()) {
+      <a routerLink="/compose" class="btn primary block compose-cta"><app-icon name="plus" [size]="16" /> New post</a>
+    }
+
+    <nav>
+      <ul class="list-reset">
+        @for (item of visibleNav(); track item.path) {
+          <li>
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: !!item.exact }"
+              #rla="routerLinkActive"
+              [attr.aria-current]="rla.isActive ? 'page' : null"
+            >
+              <app-icon [name]="item.icon" [size]="18" />
+              <span>{{ item.label }}</span>
+              @if (item.path === '/channels' && reauthCount()) {
+                <span class="nav-badge" [attr.aria-label]="reauthCount() + ' channels need reconnecting'">{{ reauthCount() }}</span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    </nav>
+
+    @if (isSuperadmin()) {
+      <nav class="platform-nav" aria-label="Platform administration">
+        <div class="nav-section">Platform</div>
+        @if (platform.publishingPaused()) {
+          <a routerLink="/platform/settings" fragment="publishing" class="paused-pill" title="All publishing is paused platform-wide">
+            <app-icon name="pause" [size]="14" /> Publishing paused
+          </a>
+        }
+        <ul class="list-reset">
+          @for (item of platformNav; track item.path) {
+            <li>
+              <a
+                [routerLink]="item.path"
+                routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: !!item.exact }"
+                #prla="routerLinkActive"
+                [attr.aria-current]="prla.isActive ? 'page' : null"
+              >
+                <app-icon [name]="item.icon" [size]="18" />
+                <span>{{ item.label }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </nav>
+    }
+
+    <div class="sidebar-foot">
+      @if (ws.active(); as w) {
+        <div class="tz-pill" title="All times are shown in the workspace time zone">
+          <app-icon name="globe" [size]="14" /> {{ w.timezone }}
+        </div>
+        <div class="role-pill">Role: <strong>{{ w.role }}</strong></div>
+      }
+    </div>
+  </aside>
+
+  <div class="scrim" (click)="sidebarOpen.set(false)" aria-hidden="true"></div>
+
+  <div class="main-col">
+    <header class="topbar">
+      <button type="button" class="btn ghost icon menu-btn" (click)="sidebarOpen.set(!sidebarOpen())" aria-label="Toggle navigation" [attr.aria-expanded]="sidebarOpen()">
+        <app-icon name="menu" />
+      </button>
+
+      <div class="ws-switcher">
+        <button type="button" class="ws-btn" (click)="wsMenu.set(!wsMenu())" aria-haspopup="menu" [attr.aria-expanded]="wsMenu()">
+          <span class="ws-mark">{{ (ws.active()?.name || '?').charAt(0).toUpperCase() }}</span>
+          <span class="ws-text">
+            <span class="ws-label">Workspace</span>
+            <span class="ws-name truncate">{{ ws.active()?.name || 'No workspace' }}</span>
+          </span>
+          <app-icon name="chevronDown" [size]="16" />
+        </button>
+        @if (wsMenu()) {
+          <div class="menu ws-menu" role="menu" style="top: calc(100% + 6px); left: 0">
+            @for (g of groups(); track g.key) {
+              <div class="menu-label">{{ g.name }}</div>
+              @for (w of g.workspaces; track w.id) {
+                <button type="button" role="menuitem" class="menu-item" [class.active]="w.slug === ws.slug()" (click)="switchTo(w.slug)">
+                  <span class="ws-mark sm" [class.archived]="w.is_archived">{{ w.name.charAt(0).toUpperCase() }}</span>
+                  <span class="truncate" style="flex: 1">{{ w.name }}</span>
+                  @if (w.is_archived) {
+                    <span class="chip outline">Archived</span>
+                  } @else {
+                    <span class="chip">{{ w.role }}</span>
+                  }
+                </button>
+              }
+            }
+            @if (archivedCount()) {
+              <button type="button" class="menu-item muted small" (click)="$event.stopPropagation(); showArchived.set(!showArchived())">
+                <app-icon [name]="showArchived() ? 'eye' : 'layers'" [size]="15" />
+                {{ showArchived() ? 'Hide archived' : 'Show archived (' + archivedCount() + ')' }}
+              </button>
+            }
+            <div class="menu-sep"></div>
+            @if (ws.adminOrgs().length) {
+              <button type="button" role="menuitem" class="menu-item" (click)="openCreate()">
+                <app-icon name="plus" [size]="16" /> New workspace
+              </button>
+            }
+            @if (canCreateOrg()) {
+              <button type="button" role="menuitem" class="menu-item" (click)="openNewOrg()">
+                <app-icon name="layers" [size]="16" /> New organization
+              </button>
+            }
+            <a role="menuitem" class="menu-item" routerLink="/organization" [queryParams]="ws.active()?.organization ? { org: ws.active()?.organization } : {}">
+              <app-icon name="settings" [size]="16" /> {{ ws.isOrgAdmin() ? 'Organization settings' : 'Organizations' }}
+            </a>
+          </div>
+        }
+      </div>
+
+      <div class="spacer"></div>
+
+      @if (!ws.canWrite() && ws.active()) {
+        <span class="chip outline" title="You can view everything but not change it">
+          <app-icon name="eye" [size]="13" /> Read-only
+        </span>
+      }
+
+      <div class="user-menu">
+        <button type="button" class="user-btn" (click)="userMenu.set(!userMenu())" aria-haspopup="menu" [attr.aria-expanded]="userMenu()" aria-label="Account menu">
+          <app-avatar [name]="userName()" [size]="34" color="var(--accent)" />
+        </button>
+        @if (userMenu()) {
+          <div class="menu" role="menu" style="top: calc(100% + 6px); right: 0">
+            <div class="user-head">
+              <strong class="truncate">{{ auth.user()?.name || 'Your account' }}</strong>
+              <span class="muted small truncate">{{ auth.user()?.email }}</span>
+            </div>
+            <div class="menu-sep"></div>
+            <a role="menuitem" class="menu-item" routerLink="/settings" fragment="profile"><app-icon name="user" [size]="16" /> Profile</a>
+            <a role="menuitem" class="menu-item" routerLink="/settings"><app-icon name="settings" [size]="16" /> Workspace settings</a>
+            <a role="menuitem" class="menu-item" routerLink="/organization"><app-icon name="layers" [size]="16" /> Organizations</a>
+            @if (!isNativeApp) {
+              <a role="menuitem" class="menu-item" routerLink="/settings" fragment="mobile-app"><app-icon name="upload" [size]="16" /> Install the app</a>
+            }
+            @if (isSuperadmin()) {
+              <a role="menuitem" class="menu-item" routerLink="/platform"><app-icon name="lock" [size]="16" /> Platform console</a>
+            }
+            <div class="menu-sep"></div>
+            <button type="button" role="menuitem" class="menu-item danger" (click)="logout()"><app-icon name="logout" [size]="16" /> Sign out</button>
+          </div>
+        }
+      </div>
+    </header>
+
+    @if (platform.announcement(); as a) {
+      <div class="announcement {{ a.level }}" [attr.role]="a.level === 'critical' ? 'alert' : 'status'">
+        <app-icon [name]="a.level === 'info' ? 'info' : 'alert'" [size]="16" />
+        <span class="pre-wrap">{{ a.text }}</span>
+        @if (a.level !== 'critical') {
+          <button type="button" class="btn ghost icon sm" (click)="platform.dismissAnnouncement()" aria-label="Dismiss announcement">
+            <app-icon name="x" [size]="14" />
+          </button>
+        }
+      </div>
+    }
+
+    <main id="main" tabindex="-1">
+      @if (suspendedName() && !workspaceFree()) {
+        <div class="page">
+          <div class="card blocked" role="alert">
+            <div class="blocked-icon"><app-icon name="lock" [size]="28" /></div>
+            <h1>Organization suspended</h1>
+            <p class="muted">
+              <strong>{{ suspendedName() }}</strong> is suspended, so its workspaces, channels and scheduled posts are paused.
+              Nothing will be published until it is reactivated. Contact support or your account owner.
+            </p>
+            <div class="row-wrap">
+              @if (ws.workspaces().length > 1) {
+                <button type="button" class="btn" (click)="wsMenu.set(true); $event.stopPropagation()">Switch workspace</button>
+              }
+              @if (isSuperadmin()) {
+                <a routerLink="/platform/organizations" class="btn primary">Open platform console</a>
+              }
+              <button type="button" class="btn ghost" (click)="logout()">Sign out</button>
+            </div>
+          </div>
+        </div>
+      } @else if (ws.loaded() && !ws.active() && !workspaceFree()) {
+        <div class="page">
+          <div class="card onboarding">
+            @if (ws.adminOrgs().length) {
+              <h1>Create your first workspace</h1>
+              <p class="muted">Workspaces hold channels, posts and analytics for one brand or client. You can invite your team later.</p>
+              <button type="button" class="btn primary lg" (click)="openCreate()"><app-icon name="plus" /> Create workspace</button>
+            } @else {
+              <h1>No workspace yet</h1>
+              <p class="muted">
+                You are not a member of any workspace. Ask an administrator of your organization to add you to one{{ canCreateOrg() ? ', or start your own organization.' : '.' }}
+              </p>
+            }
+            @if (canCreateOrg()) {
+              <button type="button" class="btn lg" [class.primary]="!ws.adminOrgs().length" (click)="openNewOrg()"><app-icon name="layers" /> Create an organization</button>
+            }
+            @if (isSuperadmin()) {
+              <a routerLink="/platform" class="btn">Open platform console</a>
+            }
+          </div>
+        </div>
+      } @else {
+        @if (ws.archived() && !workspaceFree()) {
+          <div class="archived-banner" role="status">
+            <app-icon name="lock" [size]="16" />
+            <span><strong>Workspace archived — read-only.</strong> Nothing here can be changed or published.</span>
+            @if (ws.isOrgAdmin() || ws.isOwner()) {
+              <a routerLink="/organization" class="btn sm">Restore in organization settings</a>
+            }
+          </div>
+        }
+        <router-outlet />
+      }
+    </main>
+  </div>
+</div>
+
+<app-modal [open]="createOpen()" title="New workspace" subtitle="A separate space with its own channels, team and schedule." (closed)="createOpen.set(false)" [dismissible]="!creating()">
+  <form id="create-ws" class="stack" (ngSubmit)="createWorkspace()">
+    <div class="field">
+      <label for="ws-name">Name</label>
+      <input id="ws-name" name="name" class="input" [(ngModel)]="newName" placeholder="Acme Coffee" required autocomplete="off" />
+    </div>
+    @if (ws.adminOrgs().length > 1) {
+      <div class="field">
+        <label for="ws-org">Organization</label>
+        <select id="ws-org" name="org" class="select" [(ngModel)]="newOrg">
+          @for (o of ws.adminOrgs(); track o.id) {
+            <option [ngValue]="o.id">{{ o.name }}</option>
+          }
+        </select>
+      </div>
+    } @else if (ws.adminOrgs().length === 1) {
+      <p class="muted small">In <strong>{{ ws.adminOrgs()[0].name }}</strong></p>
+    }
+    <div class="field">
+      <label for="ws-tz">Time zone</label>
+      <select id="ws-tz" name="tz" class="select" [(ngModel)]="newTz">
+        @for (tz of timezones; track tz) {
+          <option [value]="tz">{{ tz }}</option>
+        }
+      </select>
+      <span class="hint">Scheduling, the calendar and best times all use this zone.</span>
+    </div>
+    @if (createError()) {
+      <div class="form-error" role="alert">{{ createError() }}</div>
+    }
+  </form>
+  <div modal-footer>
+    <button type="button" class="btn" (click)="createOpen.set(false)">Cancel</button>
+    <button type="submit" form="create-ws" class="btn primary" [disabled]="creating()">
+      @if (creating()) {
+        <span class="spinner"></span>
+      }
+      Create workspace
+    </button>
+  </div>
+</app-modal>
+
+<app-new-org-dialog [open]="newOrgOpen()" (closed)="newOrgOpen.set(false)" />

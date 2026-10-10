@@ -1,0 +1,122 @@
+.org-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 16px;
+  align-items: start;
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.pad {
+  padding: 18px 20px 0;
+}
+.card-head.pad {
+  padding-bottom: 4px;
+}
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  --meter: var(--accent);
+  &.near {
+    --meter: var(--warning);
+  }
+  &.full {
+    --meter: var(--danger);
+  }
+}
+.meter-top {
+  color: var(--text-2);
+}
+.bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  overflow: hidden;
+  span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--meter);
+    transition: width 0.3s var(--ease);
+    &.unlimited {
+      background: repeating-linear-gradient(135deg, var(--accent-soft) 0 6px, transparent 6px 12px);
+    }
+  }
+}
+tr.archived td {
+  color: var(--muted);
+}
+.actions-cell {
+  text-align: right;
+  white-space: nowrap;
+  .btn + .btn {
+    margin-left: 6px;
+  }
+}
+.access {
+  gap: 4px;
+  max-width: 420px;
+}
+.invite-form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.inv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    flex-wrap: wrap;
+    &.fresh {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+  }
+}
+.link-text {
+  color: var(--muted);
+  max-width: 100%;
+  display: block;
+}
+
+.leave-card {
+  margin-top: 16px;
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+.ws-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  li {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+}
+.ws-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #b93cf0);
+  flex: none;
+}

@@ -1,0 +1,359 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <div class="eyebrow">Calendar</div>
+      <h1>{{ title() }}</h1>
+      <p class="subtitle">
+        Times in <strong>{{ ws.timezone() }}</strong> ({{ tzLabel() }})
+        @if (canDrag()) {
+          · drag a scheduled post to move it
+        }
+      </p>
+    </div>
+    <div class="actions">
+      @if (loading()) {
+        <span class="spinner muted" aria-label="Loading"></span>
+      }
+      <div class="segmented" role="tablist" aria-label="Calendar view">
+        <button type="button" role="tab" [attr.aria-selected]="view() === 'month'" (click)="setView('month')">Month</button>
+        <button type="button" role="tab" [attr.aria-selected]="view() === 'week'" (click)="setView('week')">Week</button>
+      </div>
+      <div class="btn-group">
+        <button type="button" class="btn icon" (click)="prev()" aria-label="Previous"><app-icon name="chevronLeft" /></button>
+        <button type="button" class="btn" (click)="goToday()">Today</button>
+        <button type="button" class="btn icon" (click)="next()" aria-label="Next"><app-icon name="chevronRight" /></button>
+      </div>
+      @if (ws.canWrite()) {
+        <a routerLink="/compose" class="btn primary"><app-icon name="plus" [size]="16" /> New post</a>
+      }
+    </div>
+  </header>
+
+  <div class="toolbar card tight">
+    <div class="channel-filter" role="group" aria-label="Filter by channel">
+      <button type="button" class="chip" [class.accent]="!channelFilter().length" [attr.aria-pressed]="!channelFilter().length" (click)="clearChannels()">
+        All channels
+      </button>
+      @for (ch of catalog.relevantChannels(); track ch.id) {
+        <button
+          type="button"
+          class="ch-toggle"
+          [class.on]="channelFilter().includes(ch.id)"
+          [attr.aria-pressed]="channelFilter().includes(ch.id)"
+          [attr.title]="ch.name"
+          (click)="toggleChannel(ch.id)"
+        >
+          <app-avatar [src]="ch.avatar_url" [name]="ch.name" [provider]="ch.provider" [size]="26" />
+          <span class="sr-only">{{ ch.name }}</span>
+        </button>
+      }
+      <app-more-channels class="more-inline" label="More" hint="" [count]="catalog.otherChannels().length" [forceOpen]="otherFiltered()">
+        <div class="channel-filter">
+          @for (ch of catalog.otherChannels(); track ch.id) {
+            <button
+              type="button"
+              class="ch-toggle"
+              [class.on]="channelFilter().includes(ch.id)"
+              [attr.aria-pressed]="channelFilter().includes(ch.id)"
+              [attr.title]="ch.name"
+              (click)="toggleChannel(ch.id)"
+            >
+              <app-avatar [src]="ch.avatar_url" [name]="ch.name" [provider]="ch.provider" [size]="26" />
+              <span class="sr-only">{{ ch.name }}</span>
+            </button>
+          }
+        </div>
+      </app-more-channels>
+    </div>
+    <div class="spacer"></div>
+    @if (catalog.teams().length) {
+      <label class="sr-only" for="cal-team">Team</label>
+      <select id="cal-team" class="select sm campaign-select" (change)="setTeam($any($event.target).value)">
+        <option value="">All teams</option>
+        @for (t of catalog.teams(); track t.id) {
+          <option [value]="t.id" [selected]="teamFilter() === t.id">{{ t.name }}</option>
+        }
+      </select>
+    }
+    <label class="sr-only" for="cal-campaign">Campaign</label>
+    <select id="cal-campaign" class="select sm campaign-select" (change)="setCampaign($any($event.target).value)">
+      <option value="">All campaigns</option>
+      @for (c of catalog.campaigns(); track c.id) {
+        <option [value]="c.id" [selected]="campaignFilter() === c.id">{{ c.name }}</option>
+      }
+    </select>
+    @if (view() === 'week') {
+      <label class="switch small">
+        <input type="checkbox" [checked]="showBest()" (change)="showBest.set($any($event.target).checked)" />
+        <span class="track"></span> Show best times
+      </label>
+      @if (showBest()) {
+        <label class="sr-only" for="best-ch">Best times for channel</label>
+        <select id="best-ch" class="select sm" (change)="setBestChannel($any($event.target).value)">
+          <optgroup label="Relevant to this workspace">
+            @for (ch of catalog.relevantChannels(); track ch.id) {
+              <option [value]="ch.id" [selected]="bestChannel() === ch.id">{{ ch.name }} ({{ ch.provider_label }})</option>
+            }
+          </optgroup>
+          @if (catalog.otherChannels().length) {
+            <optgroup label="More from your organization">
+              @for (ch of catalog.otherChannels(); track ch.id) {
+                <option [value]="ch.id" [selected]="bestChannel() === ch.id">{{ ch.name }} ({{ ch.provider_label }})</option>
+              }
+            </optgroup>
+          }
+        </select>
+        @if (bestLoading()) {
+          <span class="spinner muted"></span>
+        }
+      }
+    }
+  </div>
+
+  @if (error()) {
+    <div class="notice danger" role="alert"><app-icon name="alert" [size]="16" /> {{ error() }}</div>
+  }
+
+  @if (view() === 'month') {
+    <div class="month card flush" role="grid" aria-label="Month view">
+      <div class="month-head" role="row">
+        @for (d of weekdays; track d) {
+          <div class="wd" role="columnheader">{{ d }}</div>
+        }
+      </div>
+      @for (week of weeks(); track week[0]) {
+        <div class="month-row" role="row">
+          @for (day of week; track day) {
+            <div
+              class="day"
+              role="gridcell"
+              [class.out]="!inMonth(day)"
+              [class.today]="day === today()"
+              [class.past]="day < today()"
+              [class.drop]="dropTarget() === day"
+              (dragover)="dragOver($event, day)"
+              (dragleave)="dropTarget.set(null)"
+              (drop)="dropOnDay($event, day)"
+            >
+              <div class="bands">
+                @for (b of bands().get(day) ?? []; track b.campaign.id) {
+                  <div class="band" [class.bs]="b.start" [class.be]="b.end" [style.background]="b.campaign.color" [attr.title]="b.campaign.name">
+                    @if (b.label) {
+                      <span>{{ b.campaign.name }}</span>
+                    }
+                  </div>
+                }
+              </div>
+              <div class="day-top">
+                <button type="button" class="day-num" (click)="openWeek(day)" [attr.aria-label]="'Open week of ' + dayHeader(day)">{{ dayNum(day) }}</button>
+                @if (canComposeAt(day, 23)) {
+                  <a class="add" routerLink="/compose" [queryParams]="composeDay(day)" [attr.aria-label]="'New post on ' + dayHeader(day)" title="New post on this day"><app-icon name="plus" [size]="14" /></a>
+                }
+              </div>
+              <div class="day-items">
+                @for (it of (byDay().get(day) ?? []).slice(0, 4); track it.id) {
+                  <div
+                    class="ev st-{{ it.status }}"
+                    [class.movable]="movable(it)"
+                    [class.pending]="isPending(it)"
+                    [class.ghost]="dragging()?.id === it.id"
+                    [style.--c]="color(it)"
+                    [attr.draggable]="movable(it)"
+                    tabindex="0"
+                    role="button"
+                    [attr.title]="itemTitle(it)"
+                    (dragstart)="dragStart($event, it)"
+                    (dragend)="dragEnd()"
+                    (click)="open(it)"
+                    (keydown)="onKey($event, it)"
+                  >
+                    <app-provider-icon [provider]="it.provider" [size]="14" />
+                    <span class="ev-time tabular">{{ time(it) }}</span>
+                    <span class="ev-label truncate">{{ label(it) }}</span>
+                    @if (isPending(it)) {
+                      <span class="review-badge" title="Pending review">review</span>
+                    }
+                    @if (it.status === 'failed') {
+                      <app-icon name="alert" [size]="12" class="danger-text" />
+                    } @else if (it.status === 'published') {
+                      <app-icon name="check" [size]="12" class="success-text" />
+                    }
+                  </div>
+                }
+                @if ((byDay().get(day)?.length ?? 0) > 4) {
+                  <button type="button" class="more link-btn" (click)="openWeek(day)">+{{ (byDay().get(day)?.length ?? 0) - 4 }} more</button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="week card flush" aria-label="Week view">
+      <div class="week-head">
+        <div class="gutter"></div>
+        @for (day of days(); track day) {
+          <div class="wh" [class.today]="day === today()">
+            <span class="wh-name">{{ dayHeader(day) }}</span>
+            <div class="bands">
+              @for (b of bands().get(day) ?? []; track b.campaign.id) {
+                <div class="band" [class.bs]="b.start" [class.be]="b.end" [style.background]="b.campaign.color" [attr.title]="b.campaign.name">
+                  @if (b.label) {
+                    <span>{{ b.campaign.name }}</span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+      <div class="week-scroll" #weekScroll>
+        <div class="week-grid">
+          @for (h of hours; track h) {
+            <div class="hour-label" [style.height.px]="HOUR_H">{{ hourLabel(h) }}</div>
+            @for (day of days(); track day) {
+              <div
+                class="slot"
+                [style.height.px]="HOUR_H"
+                [style.background]="heat(day, h)"
+                [class.today]="day === today()"
+                [class.drop]="dropTarget() === day + '|' + h"
+                (dragover)="dragOver($event, day + '|' + h)"
+                (dragleave)="dropTarget.set(null)"
+                (drop)="dropOnHour($event, day, h)"
+              >
+                @if (day === nowLine().day && h === nowLine().hour) {
+                  <div class="now" [style.top.px]="((nowLine().minutes % 60) / 60) * HOUR_H" aria-hidden="true"></div>
+                }
+                @if (canComposeAt(day, h)) {
+                  <a class="add slot-add" routerLink="/compose" [queryParams]="composeAt(day, h)" [attr.aria-label]="'New post ' + dayHeader(day) + ' ' + hourLabel(h)" title="New post at this time"><app-icon name="plus" [size]="12" /></a>
+                }
+                @for (it of itemsAt(day, h); track it.id) {
+                  <div
+                    class="ev compact st-{{ it.status }}"
+                    [class.movable]="movable(it)"
+                    [class.pending]="isPending(it)"
+                    [class.ghost]="dragging()?.id === it.id"
+                    [style.--c]="color(it)"
+                    [attr.draggable]="movable(it)"
+                    tabindex="0"
+                    role="button"
+                    [attr.title]="itemTitle(it)"
+                    (dragstart)="dragStart($event, it)"
+                    (dragend)="dragEnd()"
+                    (click)="open(it)"
+                    (keydown)="onKey($event, it)"
+                  >
+                    <app-provider-icon [provider]="it.provider" [size]="13" />
+                    <span class="ev-time tabular">{{ time(it) }}</span>
+                    <span class="ev-label truncate">{{ label(it) }}</span>
+                    @if (isPending(it)) {
+                      <span class="review-badge" title="Pending review">review</span>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+      </div>
+      @if (showBest() && bestScores()) {
+        <div class="best-legend small muted">
+          <span class="ramp"></span> Shaded hours score higher for this channel's audience
+        </div>
+      }
+    </div>
+  }
+
+  @if (!loading() && !items().length && !error()) {
+    <p class="muted small empty-hint">
+      Nothing scheduled in this period.
+      @if (ws.canWrite()) {
+        <a routerLink="/compose">Compose a post</a> and schedule it to see it here.
+      }
+    </p>
+  }
+
+  <div class="legend small muted">
+    <span><span class="lg-dot st-scheduled"></span>Scheduled</span>
+    <span><span class="lg-dot st-published"></span>Published</span>
+    <span><span class="lg-dot st-failed"></span>Failed</span>
+    <span><span class="lg-dot st-draft"></span>Draft</span>
+  </div>
+</div>
+
+@if (selected(); as it) {
+  <div class="drawer-backdrop" (click)="closeDrawer()" aria-hidden="true"></div>
+  <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="cal-drawer-title" (keydown.escape)="closeDrawer()">
+    <div class="drawer-head">
+      <app-provider-icon [provider]="it.provider" [size]="22" />
+      <h2 id="cal-drawer-title" class="truncate" style="flex: 1; font-size: 1.05rem">{{ it.post_title || 'Publication' }}</h2>
+      <button type="button" class="btn ghost icon sm" (click)="closeDrawer()" aria-label="Close details"  #drawerClose>
+        <app-icon name="x" />
+      </button>
+    </div>
+    <div class="drawer-body stack">
+      <div class="row-wrap">
+        <app-channel-badge [channel]="catalog.channel(it.channel)" [size]="32" [fallback]="it.channel_name" />
+        <div class="spacer"></div>
+        @if (isPending(it)) {
+          <span class="chip warning"><app-icon name="clock" [size]="12" /> Pending review</span>
+        }
+        <app-status-chip [status]="it.status" />
+      </div>
+      @if (isPending(it)) {
+        <p class="notice warning small">This post is waiting for a reviewer. It cannot be moved until it is approved.</p>
+      }
+      @if (it.thumbnail) {
+        <img class="thumb" [src]="it.thumbnail" alt="" />
+      }
+      @if (it.excerpt) {
+        <p class="pre-wrap excerpt">{{ it.excerpt }}</p>
+      }
+      <dl class="facts">
+        @if (it.scheduled_at) {
+          <dt>Scheduled</dt>
+          <dd>{{ it.scheduled_at | tzDate: 'full' }}</dd>
+        }
+        @if (it.published_at) {
+          <dt>Published</dt>
+          <dd>{{ it.published_at | tzDate: 'full' }}</dd>
+        }
+        @if (it.schedule_reason) {
+          <dt>Why this time</dt>
+          <dd>{{ it.schedule_reason }}</dd>
+        }
+        @if (it.campaign && catalog.campaignMap().get(it.campaign); as c) {
+          <dt>Campaign</dt>
+          <dd><span class="color-dot" [style.background]="c.color"></span> {{ c.name }}</dd>
+        }
+      </dl>
+      @if (metricEntries(it).length) {
+        <div class="metrics">
+          @for (m of metricEntries(it); track m.key) {
+            <div class="metric">
+              <span class="tiny muted">{{ m.key }}</span>
+              <strong class="tabular">{{ m.value | num }}</strong>
+            </div>
+          }
+          @if (it.metrics.engagement_rate !== null && it.metrics.engagement_rate !== undefined) {
+            <div class="metric">
+              <span class="tiny muted">eng. rate</span>
+              <strong class="tabular">{{ it.metrics.engagement_rate | pct }}</strong>
+            </div>
+          }
+        </div>
+      }
+    </div>
+    <div class="drawer-foot">
+      <a class="btn" [routerLink]="['/posts', it.post_id]"><app-icon name="eye" [size]="16" /> View post</a>
+      @if (ws.canWrite() && it.status !== 'published' && it.status !== 'publishing') {
+        <a class="btn primary" [routerLink]="['/posts', it.post_id, 'edit']"><app-icon name="edit" [size]="16" /> Edit post</a>
+      }
+      @if (it.external_url) {
+        <a class="btn ghost" [href]="it.external_url" target="_blank" rel="noopener"><app-icon name="external" [size]="16" /> Open on network</a>
+      }
+    </div>
+  </aside>
+}

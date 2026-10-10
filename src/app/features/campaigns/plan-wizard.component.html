@@ -1,0 +1,235 @@
+<app-modal
+  [open]="open()"
+  size="xl"
+  [title]="'Plan “' + campaign().name + '” with AI'"
+  [subtitle]="step() === 'review' ? 'Review and edit the proposed posts, then create them.' : 'Markette drafts an arc of posts, adapted per network and timed for each audience.'"
+  [dismissible]="step() !== 'creating'"
+  (closed)="close()"
+>
+  <ol class="steps" aria-label="Progress">
+    <li [class.on]="step() === 'setup' || step() === 'loading'" [class.done]="step() !== 'setup' && step() !== 'loading'">1 · Setup</li>
+    <li [class.on]="step() === 'review'" [class.done]="step() === 'creating' || step() === 'done'">2 · Review</li>
+    <li [class.on]="step() === 'creating' || step() === 'done'">3 · Create</li>
+  </ol>
+
+  @switch (step()) {
+    @case ('setup') {
+      <form id="plan-setup" class="stack" (ngSubmit)="generate()" novalidate>
+        <fieldset class="field plain">
+          <legend class="label">Channels</legend>
+          @if (!channels().length) {
+            <p class="muted small">No channels connected yet. <a routerLink="/channels">Connect a channel</a> first.</p>
+          } @else {
+            <div class="ch-picks">
+              @for (ch of relevantList(); track ch.id) {
+                <button
+                  type="button"
+                  class="ch-pick"
+                  [class.on]="selected().has(ch.id)"
+                  [attr.aria-pressed]="selected().has(ch.id)"
+                  (click)="toggleChannel(ch.id)"
+                  [title]="ch.name"
+                >
+                  <app-avatar [src]="ch.avatar_url" [name]="ch.name" [provider]="ch.provider" [size]="34" [ring]="selected().has(ch.id) ? color(ch) : null" />
+                  <span class="truncate small">{{ ch.name }}</span>
+                  @if (ch.status === 'needs_reauth') {
+                    <span class="chip warning tiny">reconnect</span>
+                  }
+                </button>
+              }
+            </div>
+            <app-more-channels [count]="otherList().length" [forceOpen]="otherSelected() || !relevantList().length">
+              <div class="ch-picks">
+                @for (ch of otherList(); track ch.id) {
+                  <button
+                    type="button"
+                    class="ch-pick"
+                    [class.on]="selected().has(ch.id)"
+                    [attr.aria-pressed]="selected().has(ch.id)"
+                    (click)="toggleChannel(ch.id)"
+                    [title]="ch.name"
+                  >
+                    <app-avatar [src]="ch.avatar_url" [name]="ch.name" [provider]="ch.provider" [size]="34" [ring]="selected().has(ch.id) ? color(ch) : null" />
+                    <span class="truncate small">{{ ch.name }}</span>
+                    @if (ch.status === 'needs_reauth') {
+                      <span class="chip warning tiny">reconnect</span>
+                    }
+                  </button>
+                }
+              </div>
+            </app-more-channels>
+          }
+        </fieldset>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="pw-start">From</label>
+            <input id="pw-start" name="start" type="date" class="input" [(ngModel)]="start" />
+          </div>
+          <div class="field">
+            <label for="pw-end">To</label>
+            <input id="pw-end" name="end" type="date" class="input" [(ngModel)]="end" [min]="start()" />
+          </div>
+          <div class="field">
+            <label for="pw-ppw">Posts per week</label>
+            <input id="pw-ppw" name="ppw" type="number" min="1" max="50" class="input" [(ngModel)]="postsPerWeek" />
+            <span class="hint">Across all channels; each post may go to several of them.</span>
+          </div>
+          <div class="field">
+            <label for="pw-lang">Language <span class="muted">(optional)</span></label>
+            <input id="pw-lang" name="lang" class="input" [(ngModel)]="language" placeholder="Same as the brief" />
+          </div>
+          <div class="field full">
+            <label for="pw-brief">Brief</label>
+            <textarea id="pw-brief" name="brief" class="textarea" rows="6" [(ngModel)]="brief" placeholder="What are you promoting, for whom, key messages, links, tone…"></textarea>
+          </div>
+        </div>
+        @if (periodError()) {
+          <p class="warning-text small">{{ periodError() }}</p>
+        }
+        @if (error()) {
+          <div class="form-error" role="alert">{{ error() }}</div>
+      <app-ai-quota-hint [message]="error()" />
+        }
+      </form>
+    }
+
+    @case ('loading') {
+      <div class="loading" role="status" aria-live="polite">
+        <div class="orb"><app-icon name="sparkles" [size]="30" /></div>
+        <h3>Planning your campaign…</h3>
+        <p class="muted">Reading the brief, checking each channel's best times and drafting copy. This usually takes 20–60 seconds.</p>
+        <p class="muted tiny tabular">{{ elapsed() }}s</p>
+      </div>
+    }
+
+    @case ('review') {
+      @if (strategy()) {
+        <div class="notice accent strategy">
+          <app-icon name="sparkles" [size]="18" />
+          <div><strong>Strategy</strong><p class="pre-wrap small">{{ strategy() }}</p></div>
+        </div>
+      }
+      @for (w of warnings(); track $index) {
+        <div class="notice warning small" style="margin-top: 8px"><app-icon name="alert" [size]="16" />{{ w }}</div>
+      }
+      @if (!draft().length) {
+        <p class="muted" style="margin-top: 16px">The planner did not propose any posts. Try a longer period or a more detailed brief.</p>
+      }
+      <ol class="plan list-reset">
+        @for (p of draft(); track $index; let i = $index) {
+          <li class="plan-post" [class.off]="!p.keep">
+            <div class="plan-head">
+              <span class="num">{{ i + 1 }}</span>
+              <input class="input sm angle" [ngModel]="p.angle" (ngModelChange)="updatePost(i, { angle: $event })" [attr.aria-label]="'Angle of post ' + (i + 1)" [disabled]="!p.keep" />
+              <label class="switch small">
+                <input type="checkbox" [checked]="p.keep" (change)="updatePost(i, { keep: !p.keep })" />
+                <span class="track"></span>
+                Include
+              </label>
+            </div>
+            @if (p.keep) {
+              <div class="pubs">
+                @for (x of p.pubs; track x.channel; let k = $index) {
+                  @let ch = catalog.channel(x.channel);
+                  <div class="pub" [class.off]="!x.keep" [style.--cc]="ch ? color(ch) : 'var(--border)'">
+                    <div class="pub-head">
+                      <app-channel-badge [channel]="ch" [size]="24" [showHandle]="false" />
+                      <span class="spacer"></span>
+                      <label class="sr-only" [for]="'pw-at-' + i + '-' + k">Publish time ({{ tzLabel() }})</label>
+                      <input
+                        [id]="'pw-at-' + i + '-' + k"
+                        type="datetime-local"
+                        class="input sm when"
+                        [ngModel]="x.local"
+                        (ngModelChange)="updatePub(i, k, { local: $event })"
+                        [disabled]="!x.keep"
+                      />
+                      <span class="muted tiny">{{ tzLabel() }}</span>
+                      <button type="button" class="btn sm icon ghost" (click)="updatePub(i, k, { keep: !x.keep })" [attr.aria-label]="x.keep ? 'Remove this publication' : 'Restore this publication'" [title]="x.keep ? 'Remove' : 'Restore'">
+                        <app-icon [name]="x.keep ? 'x' : 'refresh'" [size]="14" />
+                      </button>
+                    </div>
+                    @if (x.keep) {
+                      @if (isBlog(ch)) {
+                        <input class="input sm" placeholder="Title" [ngModel]="x.title" (ngModelChange)="updatePub(i, k, { title: $event })" [attr.aria-label]="'Title for ' + (ch?.name ?? 'channel')" />
+                      }
+                      <textarea class="textarea" rows="4" [ngModel]="x.body" (ngModelChange)="updatePub(i, k, { body: $event })" [attr.aria-label]="'Copy for ' + (ch?.name ?? 'channel')"></textarea>
+                      <div class="row">
+                        <span class="spacer"></span>
+                        <app-char-counter [count]="count(x.channel, x.body)" [max]="maxChars(x.channel)" />
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </li>
+        }
+      </ol>
+    }
+
+    @case ('creating') {
+      <div class="loading" role="status" aria-live="polite">
+        <span class="spinner" style="width: 28px; height: 28px"></span>
+        <h3>Creating posts… {{ progress() }} / {{ keptPosts().length }}</h3>
+      </div>
+    }
+
+    @case ('done') {
+      <div class="stack">
+        <div class="notice" [class.success]="okCount() === results().length" [class.warning]="okCount() !== results().length">
+          <app-icon [name]="okCount() === results().length ? 'check' : 'alert'" [size]="18" />
+          <span>{{ okCount() }} of {{ results().length }} posts created.</span>
+        </div>
+        <ul class="list-reset results">
+          @for (r of results(); track $index) {
+            <li>
+              <app-icon [name]="r.ok ? 'check' : 'x'" [size]="16" [class]="r.ok ? 'success-text' : 'danger-text'" />
+              <div class="grow">
+                <div class="strong">{{ r.angle }}</div>
+                @if (r.ok && r.scheduled) {
+                  <div class="small success-text">Scheduled</div>
+                } @else if (r.ok && !r.error) {
+                  <div class="small muted">Draft</div>
+                }
+                @if (r.error) {
+                  <div class="small danger-text pre-wrap">{{ r.error }}</div>
+                }
+              </div>
+              @if (r.postId) {
+                <a class="btn sm ghost" [routerLink]="['/posts', r.postId, 'edit']" (click)="close()">Edit</a>
+              }
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  }
+
+  <div modal-footer>
+    @switch (step()) {
+      @case ('setup') {
+        <button type="button" class="btn" (click)="close()">Cancel</button>
+        <button type="submit" form="plan-setup" class="btn ai" [disabled]="!selected().size || !!periodError()">
+          <app-icon name="sparkles" [size]="16" /> Generate plan
+        </button>
+      }
+      @case ('loading') {
+        <button type="button" class="btn" (click)="backToSetup()">Cancel</button>
+      }
+      @case ('review') {
+        <button type="button" class="btn ghost" (click)="backToSetup()"><app-icon name="arrowLeft" [size]="16" /> Back</button>
+        <span class="spacer"></span>
+        <span class="muted small">{{ keptPosts().length }} posts · {{ keptPubCount() }} publications</span>
+        <button type="button" class="btn" (click)="create(false)" [disabled]="!keptPosts().length">Create drafts</button>
+        <button type="button" class="btn primary" (click)="create(true)" [disabled]="!keptPosts().length">
+          <app-icon name="calendar" [size]="16" /> Create & schedule
+        </button>
+      }
+      @case ('done') {
+        <button type="button" class="btn primary" (click)="close()">Done</button>
+      }
+    }
+  </div>
+</app-modal>
