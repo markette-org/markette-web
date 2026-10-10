@@ -16,6 +16,16 @@ export function browserTimezone(): string {
   }
 }
 
+/** A ?ws=<slug> in the address (links from the browser extension) picks the workspace on load. */
+function initialSlug(): string | null {
+  const fromUrl = new URLSearchParams(location.search).get('ws');
+  if (fromUrl && /^[\w-]{1,100}$/.test(fromUrl)) {
+    storage.set(KEY, fromUrl);
+    return fromUrl;
+  }
+  return storage.get(KEY);
+}
+
 /** Why the tenant area is blocked (set by the HTTP interceptor on 403s). */
 export type BlockReason = 'suspended' | null;
 
@@ -27,7 +37,7 @@ export class WorkspaceService {
   readonly workspaces = signal<Workspace[]>([]);
   readonly organizations = signal<Organization[]>([]);
   readonly loaded = signal(false);
-  readonly activeSlug = signal<string | null>(storage.get(KEY));
+  readonly activeSlug = signal<string | null>(initialSlug());
   /** Bumps on every workspace switch; feature pages can depend on it to reload. */
   readonly epoch = signal(0);
   /** Set when the API says the organization is suspended. */

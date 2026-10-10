@@ -385,8 +385,10 @@ export class ComposePage implements OnInit {
         this.choice.set('exact');
       }
       const channel = qp.get('channel');
+      const channels = (qp.get('channels') ?? '').split(',').filter((x) => /^\d+$/.test(x) && this.catalog.channel(+x)).map(Number);
       const shared = qp.has('shared') || qp.has('text') || qp.has('link') || qp.has('media');
-      if (channel && this.catalog.channel(+channel)) this.selected.set([+channel]);
+      if (channels.length) this.selected.set(channels);
+      else if (channel && this.catalog.channel(+channel)) this.selected.set([+channel]);
       else {
         const relevant = this.catalog.activeChannels().filter((c) => c.relevant !== false);
         if (!shared && relevant.length === 1) this.selected.set([relevant[0].id]);
