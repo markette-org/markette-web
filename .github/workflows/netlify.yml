@@ -1,15 +1,13 @@
 name: Netlify
 
-# Publishes the web app to Netlify: production from main, a preview for each pull request.
+# Publishes a Netlify preview of the web app for each pull request (production, app.markette.org,
+# is on GitHub Pages: see pages.yml). A manual run deploys to the Netlify site's production URL.
 # Repository settings needed:
 #   secrets   NETLIFY_AUTH_TOKEN  (Netlify → User settings → Applications → Personal access tokens)
 #             NETLIFY_SITE_ID     (Netlify → Site configuration → Site details → Site ID)
 #   variables MARKETTE_API_ORIGIN (the Markette server the site proxies to; default https://api.markette.org)
-# Custom domain (app.markette.org) is set on the Netlify site: Domain management → Add a domain.
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 

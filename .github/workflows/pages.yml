@@ -1,14 +1,12 @@
 name: GitHub Pages
 
-# Publishes the web app to GitHub Pages on every push to main.
-# The organization site (markette-org.github.io) has the custom domain markette.org, so this
-# project site is served at https://markette.org/markette-web/.
+# Publishes the web app to GitHub Pages (https://app.markette.org) on every push to main.
 # GitHub Pages cannot proxy, so the browser calls the Markette server directly: the server must
-# list the Pages origin (https://markette.org) in CORS_ALLOWED_ORIGINS and DJANGO_CSRF_TRUSTED_ORIGINS.
+# list https://app.markette.org in CORS_ALLOWED_ORIGINS and DJANGO_CSRF_TRUSTED_ORIGINS.
 # Repository settings:
-#   Settings → Pages → Source: GitHub Actions
+#   Settings → Pages → Source: GitHub Actions, custom domain app.markette.org, Enforce HTTPS
 #   variables MARKETTE_API_ORIGIN (default https://api.markette.org)
-#             PAGES_BASE_HREF     (default /markette-web/; set to / with a custom domain on this repo)
+#             PAGES_BASE_HREF     (default /; /markette-web/ without a custom domain)
 
 on:
   push:
@@ -46,7 +44,7 @@ jobs:
           printf "export const environment = {\n  production: true,\n  apiUrl: '%s',\n};\n" "$origin" > src/environments/environment.ts
       - name: Build
         env:
-          BASE_HREF: ${{ vars.PAGES_BASE_HREF || '/markette-web/' }}
+          BASE_HREF: ${{ vars.PAGES_BASE_HREF || '/' }}
         run: npm run build -- --base-href "$BASE_HREF"
       - name: Single-page app fallback
         run: |
