@@ -141,7 +141,7 @@ export const NETWORK_APPS: { key: SectionKey; provider: string; label: string; c
     provider: 'slack',
     label: 'Slack',
     callback: 'slack',
-    note: 'Optional: with an app here users get "Add to Slack"; without it they paste a bot token. Add this redirect URL under OAuth & Permissions with the bot scopes chat:write, chat:write.public, channels:read, channels:join, groups:read, files:write, files:read, team:read, and turn on public distribution to let other workspaces install it.',
+    note: 'Optional: with an app here users get "Add to Slack"; without it they paste a bot token. Add this redirect URL under OAuth & Permissions with the bot scopes chat:write, chat:write.public, channels:read, channels:join, groups:read, channels:history, groups:history, files:write, files:read, team:read, and turn on public distribution to let other workspaces install it.',
   },
   {
     key: 'youtube',
