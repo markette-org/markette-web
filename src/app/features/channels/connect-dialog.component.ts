@@ -108,6 +108,16 @@ type CredValue = string | boolean;
                   </span>
                 </div>
               }
+              @case ('slack') {
+                <div class="notice accent small">
+                  <app-icon name="info" [size]="16" />
+                  <span>
+                    Create an app at <strong>api.slack.com/apps</strong>, add the bot scopes listed below under <strong>OAuth &amp; Permissions</strong>,
+                    install it to your workspace and paste the <strong>Bot User OAuth Token</strong>. It can post in every public channel;
+                    for a private channel, add the app to it first.
+                  </span>
+                </div>
+              }
               @case ('ghost') {
                 <div class="notice accent small">
                   <app-icon name="info" [size]="16" />

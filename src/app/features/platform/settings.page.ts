@@ -21,7 +21,7 @@ import { RelativeTimePipe, TzDatePipe } from '../../shared/pipes/tz-date.pipe';
 import { PlatformHeaderComponent } from './platform-header.component';
 import { copyText } from './platform-utils';
 
-type SectionKey = 'general' | 'announcement' | 'signups' | 'plan' | 'publishing' | 'ai' | 'x' | 'linkedin' | 'meta' | 'threads' | 'reddit' | 'youtube' | 'mastodon' | 'billing';
+type SectionKey = 'general' | 'announcement' | 'signups' | 'plan' | 'publishing' | 'ai' | 'x' | 'linkedin' | 'meta' | 'threads' | 'reddit' | 'slack' | 'youtube' | 'mastodon' | 'billing';
 type LimitKey = 'default_max_workspaces' | 'default_max_channels' | 'default_max_members' | 'default_ai_monthly_tokens';
 
 interface OverrideField {
@@ -91,6 +91,7 @@ const SECTION_OVERRIDES: Partial<Record<SectionKey, OverrideField[]>> = {
       hint: 'Reddit requires a descriptive one, e.g. "web:markette:1.0 (by /u/yourname)".',
     },
   ],
+  slack: [{ name: 'SLACK_CLIENT_ID', label: 'Client ID', kind: 'text', hint: 'api.slack.com/apps → your app → Basic Information → App Credentials.' }],
   youtube: [{ name: 'GOOGLE_CLIENT_ID', label: 'OAuth client ID', kind: 'text', hint: 'Google Cloud → APIs & Services → Credentials → OAuth client (Web application).' }],
   mastodon: [{ name: 'MASTODON_APP_NAME', label: 'App name', kind: 'text', hint: 'Shown on Mastodon servers as the posting application.' }],
 };
@@ -102,6 +103,7 @@ const SECTION_SECRETS: Partial<Record<SectionKey, { name: string; label: string 
   meta: [{ name: 'META_APP_SECRET', label: 'App secret' }],
   threads: [{ name: 'THREADS_APP_SECRET', label: 'Threads app secret' }],
   reddit: [{ name: 'REDDIT_CLIENT_SECRET', label: 'Client secret' }],
+  slack: [{ name: 'SLACK_CLIENT_SECRET', label: 'Client secret' }],
   youtube: [{ name: 'GOOGLE_CLIENT_SECRET', label: 'OAuth client secret' }],
   billing: [
     { name: 'STRIPE_SECRET_KEY', label: 'Secret key' },
@@ -133,6 +135,13 @@ export const NETWORK_APPS: { key: SectionKey; provider: string; label: string; c
     label: 'Reddit',
     callback: 'reddit',
     note: 'Create a "web app" at reddit.com/prefs/apps with this redirect URI. New Reddit apps need approval under Reddit\'s Responsible Builder Policy before they can post.',
+  },
+  {
+    key: 'slack',
+    provider: 'slack',
+    label: 'Slack',
+    callback: 'slack',
+    note: 'Optional: with an app here users get "Add to Slack"; without it they paste a bot token. Add this redirect URL under OAuth & Permissions with the bot scopes chat:write, chat:write.public, channels:read, channels:join, groups:read, files:write, files:read, team:read, and turn on public distribution to let other workspaces install it.',
   },
   {
     key: 'youtube',
@@ -236,7 +245,7 @@ export class PlatformSettingsPage implements OnInit {
     out.announcement = this.announcement() !== (d.announcement || '') || this.level() !== d.announcement_level;
     out.signups = this.signupsOpen() !== d.signups_open || this.orgCreationOpen() !== d.org_creation_open || this.domains().join(', ') !== this.splitDomains(d.signup_domains).join(', ');
     out.plan = LIMITS.some(({ key }) => this.limitValue(key) !== d[key]);
-    for (const key of ['publishing', 'ai', 'x', 'linkedin', 'meta', 'threads', 'reddit', 'youtube', 'mastodon', 'billing'] as SectionKey[]) {
+    for (const key of ['publishing', 'ai', 'x', 'linkedin', 'meta', 'threads', 'reddit', 'slack', 'youtube', 'mastodon', 'billing'] as SectionKey[]) {
       const fields = SECTION_OVERRIDES[key] ?? [];
       let changed = fields.some((f) => this.ovr()[f.name] !== overrideToDraft(d.overrides[f.name]?.value, f.kind));
       changed ||= (SECTION_SECRETS[key] ?? []).some((s) => !!this.secretDraft()[s.name]?.trim());

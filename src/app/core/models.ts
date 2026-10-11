@@ -156,6 +156,7 @@ export type ProviderKey =
   | 'reddit'
   | 'youtube'
   | 'discord'
+  | 'slack'
   | 'ghost'
   | 'brevo'
   | 'listmonk'
