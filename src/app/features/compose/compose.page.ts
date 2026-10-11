@@ -28,6 +28,7 @@ import {
   PostWrite,
   SchedulePayload,
   Suggestion,
+  FollowMode,
   TargetOptions,
 } from '../../core/models';
 import { PostsService } from '../../core/posts.service';
@@ -52,7 +53,7 @@ import { RedditOptionsComponent } from './reddit-options.component';
 import { RedditPreviewComponent } from './reddit-preview.component';
 import { redditKind, redditLink, redditLinkComment, redditProblems } from './reddit';
 import { SpecialPreviewComponent } from './special-preview.component';
-import { ChannelDraft, ChannelState, LOCKED_STATES, ScheduleChoice } from './compose.models';
+import { ChannelDraft, ChannelState, FollowCandidate, FollowDraft, LOCKED_STATES, ScheduleChoice } from './compose.models';
 
 interface Uploading {
   key: number;
@@ -61,6 +62,15 @@ interface Uploading {
 }
 
 const EMPTY_DRAFT: ChannelDraft = { body: '', title: '', options: {} };
+/** Stands in for the followed publication's URL when counting characters (as the backend does). */
+const SAMPLE_URL = 'https://example.org/' + 'x'.repeat(40);
+
+/** What a follower actually sends: {url} and {title} filled in, the URL appended when missing. */
+export function fillFollow(text: string, url: string, title: string): string {
+  let out = text.replaceAll('{url}', url).replaceAll('{title}', title);
+  if (!out.includes(url)) out = out.trim() ? `${out.trimEnd()}\n\n${url}` : url;
+  return out;
+}
 
 @Component({
   selector: 'app-compose-page',
@@ -156,6 +166,17 @@ export class ComposePage implements OnInit {
   protected readonly suggestSummary = signal('');
   protected readonly suggestions = signal<Suggestion[]>([]);
 
+  /* --- following another publication ------------------------------------------------- */
+  /** Publications of other posts that a channel can wait for (loaded on demand). */
+  protected readonly followCandidates = signal<FollowCandidate[]>([]);
+  protected readonly followLoading = signal(false);
+  private followLoaded = false;
+  protected readonly followModes: { value: FollowMode; label: string }[] = [
+    { value: 'delay', label: 'Right after it, or after a delay' },
+    { value: 'queue', label: 'In the next queue slot after it' },
+    { value: 'best_time', label: 'At the best time after it' },
+  ];
+
   protected readonly tz = computed(() => this.ws.timezone());
   protected readonly tzLabel = computed(() => `${this.tz()} (${tzAbbrev(this.tz())})`);
   protected readonly fmtBytes = fmtBytes;
@@ -198,12 +219,15 @@ export class ComposePage implements OnInit {
         const needsTitle = isBlog || isNewsletter || !!provider?.supports_title || forumThread;
         const body = d.body.trim() ? d.body : this.body();
         const title = d.title.trim() ? d.title : this.title();
+        const follow = this.followInfo(channel.id, d.follow ?? null);
+        // Count what will be sent: the followed publication's URL fills {url} (or is appended).
+        const sentBody = follow ? fillFollow(body, SAMPLE_URL, follow.title) : body;
         let firstComment: ChannelState['firstComment'] = null;
-        let postedText = body;
+        let postedText = sentBody;
         if (provider?.supports_first_comment) {
           const channelDefault = !!channel.config?.['links_in_first_comment'];
           const override = d.options.links_in_first_comment;
-          const split = splitFirstComment(body, this.link().trim(), d.options.first_comment, override ?? channelDefault);
+          const split = splitFirstComment(sentBody, this.link().trim(), d.options.first_comment, override ?? channelDefault);
           postedText = split.text;
           firstComment = {
             ...split,
@@ -263,6 +287,7 @@ export class ComposePage implements OnInit {
         } else if (channel.provider === 'qq' && channel.config?.['kind'] === 'group' && /https?:\/\/[^\s<>"']+/i.test(body)) {
           problems.push('QQ does not allow links in group messages; remove them.');
         }
+        if (follow?.problem) problems.push(follow.problem);
         if (channel.status === 'needs_reauth') problems.push(`${channel.name} needs to be reconnected.`);
         for (const p of server[channel.id] ?? []) if (!problems.includes(p)) problems.push(p);
         const target = this.targetsByChannel().get(channel.id);
@@ -289,11 +314,14 @@ export class ComposePage implements OnInit {
           customized: !!(d.body.trim() || d.title.trim()),
           firstComment,
           reddit,
+          follow: follow ? { label: follow.label, mode: follow.mode, delay: follow.delay } : null,
         };
       });
   });
 
   protected readonly anyBlog = computed(() => this.states().some((s) => s.needsTitle));
+  /** Channels that wait for another publication. */
+  protected readonly followers = computed(() => this.states().filter((s) => s.follow && !s.locked));
   protected readonly titleLabel = computed(() => {
     const st = this.states().filter((s) => s.needsTitle);
     if (st.length && st.every((s) => s.isNewsletter)) return 'Email subject';
@@ -403,6 +431,8 @@ export class ComposePage implements OnInit {
         this.media.set(assets.filter((a): a is MediaAsset => !!a));
       }
       if (qp.has('shared')) await this.applyShareDraft();
+      const follow = qp.get('follow');
+      if (follow && /^\d+$/.test(follow)) await this.startAnnouncement(+follow);
       if (shared) this.sharedBanner.set(true);
     }
     this.loading.set(false);
@@ -457,13 +487,151 @@ export class ComposePage implements OnInit {
     const live = post.targets.filter((t) => t.status !== 'cancelled');
     this.selected.set(live.map((t) => t.channel));
     const drafts: Record<number, ChannelDraft> = {};
-    for (const t of live) drafts[t.channel] = { body: t.body ?? '', title: t.title ?? '', options: { ...(t.options ?? {}) } };
+    const external: FollowCandidate[] = [];
+    for (const t of live) {
+      const src = t.follows_detail;
+      let follow: FollowDraft | null = null;
+      if (src) {
+        const samePost = src.post_id === post.id;
+        follow = { channel: samePost ? src.channel : null, target: samePost ? null : src.id, mode: t.follow_mode, delay: t.follow_delay };
+        if (!samePost) external.push(this.candidateFrom(src.id, src.post_id, src.post_title, src.channel_name, src.provider, src.status));
+      }
+      drafts[t.channel] = { body: t.body ?? '', title: t.title ?? '', options: { ...(t.options ?? {}) }, follow };
+    }
     this.drafts.set(drafts);
+    if (external.length) this.mergeCandidates(external);
     this.choice.set(post.status === 'scheduled' ? 'keep' : 'draft');
     if (post.window_start) this.windowStart.set(toLocalInput(post.window_start, this.tz()));
     if (post.window_end) this.windowEnd.set(toLocalInput(post.window_end, this.tz()));
     const firstScheduled = live.find((t) => t.scheduled_at)?.scheduled_at;
     if (firstScheduled && new Date(firstScheduled).getTime() > Date.now()) this.exactAt.set(toLocalInput(firstScheduled, this.tz()));
+  }
+
+  /* --- following another publication ------------------------------------------------- */
+
+  private candidateFrom(id: Id, postId: Id, postTitle: string, channelName: string, provider: string, status: FollowCandidate['status']): FollowCandidate {
+    const title = (postTitle || 'Untitled post').trim();
+    const short = title.length > 60 ? `${title.slice(0, 59)}…` : title;
+    return { id, postId, label: `${channelName}: “${short}”`, channelName, provider, status, title: postTitle };
+  }
+
+  private mergeCandidates(list: FollowCandidate[]) {
+    this.followCandidates.update((cur) => {
+      const seen = new Set(cur.map((c) => c.id));
+      return [...cur, ...list.filter((c) => !seen.has(c.id))];
+    });
+  }
+
+  /** Recent publications of other posts (drafts, scheduled and published). */
+  protected async loadFollowCandidates() {
+    if (this.followLoaded || this.followLoading()) return;
+    this.followLoading.set(true);
+    try {
+      const page = await firstValueFrom(this.posts.list({ ordering: '-updated_at', limit: 50 }));
+      const own = this.post()?.id;
+      const list: FollowCandidate[] = [];
+      for (const p of page.results) {
+        if (p.id === own) continue;
+        for (const t of p.targets) {
+          if (t.status === 'cancelled' || t.status === 'failed') continue;
+          const title = p.title || p.body.replace(/\s+/g, ' ').slice(0, 60);
+          list.push(this.candidateFrom(t.id, p.id, title, t.channel_detail?.name ?? 'Channel', t.channel_detail?.provider ?? '', t.status));
+        }
+      }
+      this.mergeCandidates(list);
+      this.followLoaded = true;
+    } catch (err) {
+      this.toast.error('Could not load your other posts', err);
+    } finally {
+      this.followLoading.set(false);
+    }
+  }
+
+  /** New post from "Announce": every channel waits for that publication and links to it. */
+  private async startAnnouncement(targetId: Id) {
+    await this.loadFollowCandidates();
+    const src = this.followCandidates().find((c) => c.id === targetId);
+    if (!src) {
+      this.toast.error('Publication not found', 'It may have been deleted, or it is older than your 50 latest posts.');
+      return;
+    }
+    if (!this.body()) this.body.set('{title}\n\n{url}');
+    const follow: FollowDraft = { channel: null, target: targetId, mode: 'delay', delay: 0 };
+    this.drafts.update((all) => {
+      const next = { ...all };
+      for (const id of this.selected()) next[id] = { ...(next[id] ?? EMPTY_DRAFT), follow };
+      return next;
+    });
+    this.announcing.set(src);
+  }
+
+  /** The publication every newly selected channel waits for (set by "Announce"). */
+  protected readonly announcing = signal<FollowCandidate | null>(null);
+
+  private followInfo(channelId: Id, f: FollowDraft | null) {
+    if (!f) return null;
+    if (f.channel) {
+      const ch = this.catalog.channel(f.channel);
+      const name = ch?.name ?? 'another channel';
+      const own = this.drafts()[f.channel];
+      const srcBody = own?.body.trim() ? own.body : this.body();
+      const firstLine = srcBody.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+      return {
+        label: `${name} (this post)`,
+        title: (own?.title.trim() ? own.title : this.title()) || firstLine.slice(0, 100),
+        mode: f.mode,
+        delay: f.delay,
+        problem: !this.selected().includes(f.channel)
+          ? `Waits for ${name}, which is no longer selected.`
+          : f.channel === channelId
+            ? 'A channel cannot wait for itself.'
+            : '',
+      };
+    }
+    const c = this.followCandidates().find((x) => x.id === f.target);
+    return { label: c?.label ?? `Publication #${f.target}`, title: c?.title ?? '', mode: f.mode, delay: f.delay, problem: '' };
+  }
+
+  protected followValue(id: Id): string {
+    const f = this.draft(id).follow;
+    return f?.channel ? `c:${f.channel}` : f?.target ? `t:${f.target}` : '';
+  }
+
+  protected setFollow(id: Id, value: string) {
+    const cur = this.draft(id).follow;
+    const [kind, raw] = value.split(':');
+    if (!kind || !raw) {
+      this.patchDraft(id, { follow: null });
+      return;
+    }
+    const ref = +raw;
+    this.patchDraft(id, {
+      follow: {
+        channel: kind === 'c' ? ref : null,
+        target: kind === 't' ? ref : null,
+        mode: cur?.mode ?? 'delay',
+        delay: cur?.delay ?? 0,
+      },
+    });
+  }
+
+  protected setFollowMode(id: Id, mode: FollowMode) {
+    const f = this.draft(id).follow;
+    if (f) this.patchDraft(id, { follow: { ...f, mode } });
+  }
+
+  protected setFollowDelay(id: Id, value: number | string | null) {
+    const f = this.draft(id).follow;
+    const minutes = Math.max(0, Math.min(43_200, Math.round(Number(value) || 0)));
+    if (f) this.patchDraft(id, { follow: { ...f, delay: minutes } });
+  }
+
+  /** Other selected channels of this post that a channel can wait for. */
+  protected followSiblings(id: Id): Channel[] {
+    return this.selected()
+      .filter((x) => x !== id)
+      .map((x) => this.catalog.channel(x))
+      .filter((c): c is Channel => !!c);
   }
 
   /* --- channel picking ---------------------------------------------------------------- */
@@ -478,7 +646,12 @@ export class ComposePage implements OnInit {
       this.toast.info('Already published', `${ch.name} has already published this post and stays attached.`);
       return;
     }
+    const adding = !this.selected().includes(ch.id);
     this.selected.update((list) => (list.includes(ch.id) ? list.filter((x) => x !== ch.id) : [...list, ch.id]));
+    const announced = this.announcing();
+    if (adding && announced && !this.draft(ch.id).follow) {
+      this.patchDraft(ch.id, { follow: { channel: null, target: announced.id, mode: 'delay', delay: 0 } });
+    }
     if (this.tab() === ch.id && !this.isSelected(ch.id)) this.tab.set('all');
     this.serverProblems.set({});
     this.suggestions.set([]);
@@ -810,7 +983,17 @@ export class ComposePage implements OnInit {
       media_ids: this.media().map((m) => m.id),
       targets: this.selected().map((channel) => {
         const d = drafts[channel] ?? EMPTY_DRAFT;
-        return { channel, body: d.body.trim() ? d.body : '', title: d.title.trim() ? d.title : '', options: d.options ?? {} };
+        const f = d.follow;
+        return {
+          channel,
+          body: d.body.trim() ? d.body : '',
+          title: d.title.trim() ? d.title : '',
+          options: d.options ?? {},
+          follows: f?.target ?? null,
+          follows_channel: f?.channel ?? null,
+          follow_mode: f?.mode ?? 'delay',
+          follow_delay: f?.delay ?? 0,
+        };
       }),
     };
   }
@@ -932,6 +1115,9 @@ export class ComposePage implements OnInit {
     const lines = post.targets
       .filter((t) => t.scheduled_at && t.status === 'scheduled')
       .map((t) => `${t.channel_detail?.name ?? 'Channel'}: ${new Intl.DateTimeFormat(undefined, { timeZone: tz, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(t.scheduled_at!))}`);
+    for (const t of post.targets.filter((x) => x.waiting)) {
+      lines.push(`${t.channel_detail?.name ?? 'Channel'}: after ${t.follows_detail?.channel_name ?? 'the publication it waits for'}`);
+    }
     return lines.slice(0, 5).join('\n');
   }
 

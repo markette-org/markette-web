@@ -179,6 +179,17 @@
               <dt>Why</dt>
               <dd>{{ t.schedule_reason }}</dd>
             }
+            @if (t.follows_detail; as src) {
+              <dt>Links to</dt>
+              <dd>
+                @if (src.post_id === p.id) {
+                  {{ src.channel_name }} (this post)
+                } @else {
+                  <a [routerLink]="['/posts', src.post_id]">{{ src.post_title || 'Untitled post' }}</a> on {{ src.channel_name }}
+                }
+                · {{ src.status }}
+              </dd>
+            }
             @if (t.published_at) {
               <dt>Published</dt>
               <dd>{{ t.published_at | tzDate: 'full' }}</dd>
@@ -299,6 +310,16 @@
                 }
                 Refresh metrics
               </button>
+            }
+            @if (t.status !== 'cancelled' && t.status !== 'failed') {
+              <a
+                class="btn sm ghost"
+                [routerLink]="['/compose']"
+                [queryParams]="{ follow: t.id }"
+                title="Write a post for other channels that goes out once this one is live, with its link"
+              >
+                <app-icon name="link" [size]="14" /> Announce
+              </a>
             }
             <div class="spacer"></div>
             @if (canCancel(t)) {

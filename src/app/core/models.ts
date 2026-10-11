@@ -418,6 +418,27 @@ export interface Target {
   metrics_updated_at: string | null;
   /** Provider extras, e.g. first_comment_id once the first comment is posted. */
   extra?: { first_comment_id?: string; [key: string]: unknown };
+  /** The publication this one waits for and links to ({url} in the text). */
+  follows: Id | null;
+  follows_detail: FollowedTarget | null;
+  follow_mode: FollowMode;
+  /** minutes after the followed publication (delay mode; also the earliest time for the others) */
+  follow_delay: number;
+  /** scheduled, waiting for the followed publication */
+  waiting: boolean;
+}
+
+export type FollowMode = 'delay' | 'queue' | 'best_time';
+
+export interface FollowedTarget {
+  id: Id;
+  post_id: Id;
+  post_title: string;
+  channel: Id;
+  channel_name: string;
+  provider: string;
+  status: TargetStatus;
+  external_url: string;
 }
 
 export interface Post {
@@ -474,6 +495,12 @@ export interface TargetWrite {
   title?: string;
   media_ids?: Id[] | null;
   options?: TargetOptions;
+  /** a publication of another post (target id) */
+  follows?: Id | null;
+  /** another channel of this same post */
+  follows_channel?: Id | null;
+  follow_mode?: FollowMode;
+  follow_delay?: number;
 }
 
 export interface PostWrite {

@@ -174,7 +174,7 @@
                 <app-icon name="layers" [size]="15" /> All channels
               </button>
               @for (s of states(); track s.channel.id) {
-                <button type="button" role="tab" [attr.aria-selected]="tab() === s.channel.id" (click)="tab.set(s.channel.id); previewFor.set(s.channel.id)">
+                <button type="button" role="tab" [attr.aria-selected]="tab() === s.channel.id" (click)="tab.set(s.channel.id); previewFor.set(s.channel.id); loadFollowCandidates()">
                   <app-provider-icon [provider]="s.channel.provider" [size]="16" />
                   <span class="truncate tab-name">{{ s.channel.name }}</span>
                   @if (s.problems.length && !s.locked) {
@@ -529,6 +529,69 @@
                 </fieldset>
               }
 
+              <fieldset class="options" [disabled]="s.locked">
+                <legend>Wait for another publication</legend>
+                <div class="form-grid">
+                  <div class="field full">
+                    <label [for]="'fw-' + s.channel.id">Publish after</label>
+                    <select
+                      class="select"
+                      [id]="'fw-' + s.channel.id"
+                      [ngModel]="followValue(s.channel.id)"
+                      (ngModelChange)="setFollow(s.channel.id, $event)"
+                      (focus)="loadFollowCandidates()"
+                    >
+                      <option value="">Nothing: use this post's schedule</option>
+                      @if (followSiblings(s.channel.id).length) {
+                        <optgroup label="This post">
+                          @for (c of followSiblings(s.channel.id); track c.id) {
+                            <option [value]="'c:' + c.id">{{ c.name }} ({{ providerMeta(c.provider).label }})</option>
+                          }
+                        </optgroup>
+                      }
+                      @if (followCandidates().length) {
+                        <optgroup label="Other posts">
+                          @for (c of followCandidates(); track c.id) {
+                            <option [value]="'t:' + c.id">{{ c.label }} · {{ c.status }}</option>
+                          }
+                        </optgroup>
+                      }
+                      @if (followLoading()) {
+                        <option disabled>Loading your other posts…</option>
+                      }
+                    </select>
+                    <span class="hint">
+                      Goes out only once that publication is live, with its address in place of <code>{{ '{url}' }}</code> and its title in place of
+                      <code>{{ '{title}' }}</code>. Without <code>{{ '{url}' }}</code> the address is added at the end.
+                    </span>
+                  </div>
+                  @if (s.follow; as f) {
+                    <div class="field">
+                      <label [for]="'fwm-' + s.channel.id">When</label>
+                      <select class="select" [id]="'fwm-' + s.channel.id" [ngModel]="f.mode" (ngModelChange)="setFollowMode(s.channel.id, $event)">
+                        @for (m of followModes; track m.value) {
+                          <option [value]="m.value">{{ m.label }}</option>
+                        }
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label [for]="'fwd-' + s.channel.id">{{ f.mode === 'delay' ? 'Delay (minutes)' : 'Not before (minutes after it)' }}</label>
+                      <input
+                        class="input"
+                        type="number"
+                        min="0"
+                        max="43200"
+                        step="5"
+                        [id]="'fwd-' + s.channel.id"
+                        [ngModel]="f.delay"
+                        (ngModelChange)="setFollowDelay(s.channel.id, $event)"
+                      />
+                      <span class="hint">0 = right after it is published</span>
+                    </div>
+                  }
+                </div>
+              </fieldset>
+
               @if (s.problems.length && !s.locked) {
                 <ul class="problems list-reset" aria-live="polite">
                   @for (p of s.problems; track p) {
@@ -540,6 +603,17 @@
           } @else {
             <!-- Shared content -->
             <div class="stack tab-panel" role="tabpanel">
+              @if (followers().length) {
+                <div class="notice accent small">
+                  <app-icon name="link" [size]="16" />
+                  <span>
+                    @for (s of followers(); track s.channel.id; let last = $last) {
+                      <strong>{{ s.channel.name }}</strong> waits for {{ s.follow!.label }}{{ last ? '.' : ';' }}
+                    }
+                    Write <code>{{ '{url}' }}</code> where its address goes and <code>{{ '{title}' }}</code> for its title. Change this in each channel's tab.
+                  </span>
+                </div>
+              }
               @if (anyBlog() || title()) {
                 <div class="field">
                   <label for="title">{{ titleLabel() }} @if (anyBlog()) {<span class="muted">(required for {{ titleLabel() === 'Email subject' ? 'newsletters' : 'some channels' }})</span>}</label>
