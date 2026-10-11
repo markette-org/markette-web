@@ -114,7 +114,7 @@
                   <span class="tchip t-{{ t.status }}" [attr.title]="tooltip(t)">
                     <app-provider-icon [provider]="t.channel_detail.provider" [size]="14" />
                     <span class="truncate tname">{{ t.channel_detail.name }}</span>
-                    @if (t.status === 'failed') {
+                    @if (t.status === 'failed' || t.status === 'unconfirmed') {
                       <app-icon name="alert" [size]="12" />
                     } @else if (t.status === 'published') {
                       <app-icon name="check" [size]="12" />

@@ -114,6 +114,13 @@
   color: var(--muted);
   margin-bottom: 8px;
 }
+.check {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+}
 .t-foot {
   display: flex;
   align-items: center;

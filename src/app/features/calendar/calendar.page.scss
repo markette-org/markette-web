@@ -73,6 +73,10 @@
     background: var(--danger-soft);
     border-left-color: var(--danger);
   }
+  &.st-unconfirmed {
+    background: var(--warning-soft);
+    border-left-color: var(--warning);
+  }
   &.st-publishing,
   &.st-queued {
     animation: pulse 1.4s ease-in-out infinite;
@@ -341,6 +345,10 @@
   &.st-failed {
     background: var(--danger-soft);
     border-left: 3px solid var(--danger);
+  }
+  &.st-unconfirmed {
+    background: var(--warning-soft);
+    border-left: 3px solid var(--warning);
   }
   &.st-draft {
     border: 1px dashed var(--muted);

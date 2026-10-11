@@ -7,6 +7,7 @@ const STYLES: Record<string, { cls: string; label: string }> = {
   publishing: { cls: 'info', label: 'Publishing' },
   published: { cls: 'success', label: 'Published' },
   partial: { cls: 'warning', label: 'Partial' },
+  unconfirmed: { cls: 'warning', label: 'Needs checking' },
   failed: { cls: 'danger', label: 'Failed' },
   cancelled: { cls: 'outline', label: 'Cancelled' },
   active: { cls: 'success', label: 'Active' },

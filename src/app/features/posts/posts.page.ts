@@ -33,6 +33,7 @@ const STATUSES: { value: PostStatus | ''; label: string }[] = [
   { value: 'publishing', label: 'Publishing' },
   { value: 'published', label: 'Published' },
   { value: 'partial', label: 'Partially published' },
+  { value: 'unconfirmed', label: 'Needs checking' },
   { value: 'failed', label: 'Failed' },
 ];
 

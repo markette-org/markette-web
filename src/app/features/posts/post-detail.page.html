@@ -252,6 +252,29 @@
               <div class="notice danger small" role="alert"><app-icon name="alert" [size]="16" /><span class="pre-wrap">{{ t.last_error }}</span></div>
             }
           }
+          @if (t.status === 'unconfirmed' && ws.canWrite()) {
+            <div class="check" role="group" [attr.aria-label]="'Check the ' + t.channel_detail.name + ' publication'">
+              <p class="small">
+                Look for the post on
+                @if (t.channel_detail.profile_url) {
+                  <a [href]="t.channel_detail.profile_url" target="_blank" rel="noopener">{{ t.channel_detail.name }}</a>.
+                } @else {
+                  {{ t.channel_detail.name }}.
+                }
+                Nothing else is published on this channel until you say what happened.
+              </p>
+              <label class="small" [for]="'found-' + t.id">Its address, if you found it</label>
+              <input #found class="input" type="url" [id]="'found-' + t.id" placeholder="https://…" />
+              <div class="row-wrap">
+                <button type="button" class="btn sm primary" (click)="resolveTarget(t, true, found.value)" [disabled]="resolving() === t.id">
+                  <app-icon name="check" [size]="14" /> It is live
+                </button>
+                <button type="button" class="btn sm" (click)="resolveTarget(t, false)" [disabled]="resolving() === t.id">
+                  <app-icon name="refresh" [size]="14" /> It is not there: publish again
+                </button>
+              </div>
+            </div>
+          }
           @for (prob of targetProblems(t); track prob) {
             <div class="notice warning small"><app-icon name="alert" [size]="16" />{{ prob }}</div>
           }

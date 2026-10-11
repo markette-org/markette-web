@@ -69,6 +69,7 @@ export class PostDetailPage {
   protected readonly analytics = signal<Record<number, TargetAnalytics>>({});
   protected readonly refreshing = signal<Id | null>(null);
   protected readonly busy = signal(false);
+  protected readonly resolving = signal<Id | null>(null);
 
   protected readonly modeLabel = MODE_LABEL;
 
@@ -218,7 +219,7 @@ export class PostDetailPage {
   }
 
   protected canCancel(t: Target): boolean {
-    return this.ws.canWrite() && ['draft', 'scheduled', 'failed'].includes(t.status);
+    return this.ws.canWrite() && ['draft', 'scheduled', 'failed', 'unconfirmed'].includes(t.status);
   }
 
   protected canDeleteRemote(t: Target): boolean {
@@ -234,7 +235,7 @@ export class PostDetailPage {
 
   /** "Published, but the first comment could not be posted: …" is a warning, not a failure. */
   protected isSoftError(t: Target): boolean {
-    return /^Published, but/i.test(t.last_error ?? '');
+    return t.status === 'unconfirmed' || /^(Published, but|Marked as published)/i.test(t.last_error ?? '');
   }
 
   /* --- post actions ---------------------------------------------------------- */
@@ -334,6 +335,22 @@ export class PostDetailPage {
         this.reloadQuietly();
       },
       error: (err) => this.toast.error('Could not cancel', err),
+    });
+  }
+
+  protected resolveTarget(t: Target, published: boolean, url = '') {
+    this.resolving.set(t.id);
+    this.posts.resolveTarget(t.id, published, url.trim()).subscribe({
+      next: (res) => {
+        this.resolving.set(null);
+        this.patchTarget(res);
+        this.toast.success(published ? 'Marked as published' : 'Publishing it again');
+        this.reloadQuietly();
+      },
+      error: (err) => {
+        this.resolving.set(null);
+        this.toast.error('Could not update the publication', err);
+      },
     });
   }
 

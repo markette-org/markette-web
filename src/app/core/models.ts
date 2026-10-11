@@ -332,8 +332,17 @@ export interface Slot {
 
 /* --- Posts ------------------------------------------------------------------ */
 
-export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'failed';
-export type TargetStatus = 'draft' | 'scheduled' | 'queued' | 'publishing' | 'published' | 'failed' | 'cancelled';
+export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'unconfirmed' | 'failed';
+export type TargetStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'queued'
+  | 'publishing'
+  | 'published'
+  // The network may have published it but its answer was lost: a person checks.
+  | 'unconfirmed'
+  | 'failed'
+  | 'cancelled';
 export type ScheduleMode = 'now' | 'exact' | 'queue' | 'best_time';
 
 export interface Metrics {

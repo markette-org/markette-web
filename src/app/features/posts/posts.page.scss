@@ -99,6 +99,11 @@
     background: var(--danger-soft);
     color: var(--danger);
   }
+  &.t-unconfirmed {
+    border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+    background: var(--warning-soft);
+    color: var(--warning);
+  }
   &.t-scheduled {
     border-color: color-mix(in srgb, var(--accent) 35%, transparent);
     color: var(--accent-ink);
