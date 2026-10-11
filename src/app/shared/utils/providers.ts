@@ -31,6 +31,7 @@ export const PROVIDER_META: Record<string, ProviderMeta> = {
   webhook: { label: 'Webhook', color: '#6B7280', ink: '#ffffff', mark: '↗', kind: 'social' },
   wordpress: { label: 'WordPress', color: '#21759b', ink: '#ffffff', mark: 'W', kind: 'blog' },
   drupal: { label: 'Drupal', color: '#0678be', ink: '#ffffff', mark: 'D', kind: 'blog' },
+  devto: { label: 'DEV', color: '#0A0A0A', ink: '#ffffff', mark: 'DEV', kind: 'blog' },
   medium: { label: 'Medium', color: '#000000', ink: '#ffffff', mark: 'M', kind: 'blog' },
   hugo: { label: 'Hugo', color: '#ff4088', ink: '#ffffff', mark: 'H', kind: 'blog' },
 };
@@ -73,6 +74,7 @@ export const PROVIDER_ORDER = [
   'wordpress',
   'drupal',
   'medium',
+  'devto',
   'ghost',
   'hugo',
   'brevo',

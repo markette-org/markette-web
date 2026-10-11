@@ -288,12 +288,23 @@
                         <option value="draft">Draft on the site</option>
                       </select>
                     </div>
-                    @if (s.channel.provider === 'medium') {
+                    @if (s.channel.provider === 'medium' || s.channel.provider === 'devto') {
                     <div class="field">
                       <label [for]="'canon-' + s.channel.id">Canonical URL</label>
                       <input class="input" type="url" [id]="'canon-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'canonical_url')" (ngModelChange)="setOption(s.channel.id, 'canonical_url', $event)" [placeholder]="link() || 'Original article, if cross-posting'" />
                       <span class="hint">Tells search engines where the original lives; defaults to the post link</span>
                     </div>
+                    @if (s.channel.provider === 'devto') {
+                    <div class="field">
+                      <label [for]="'series-' + s.channel.id">Series</label>
+                      <input class="input" [id]="'series-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'series')" (ngModelChange)="setOption(s.channel.id, 'series', $event)" placeholder="None" />
+                      <span class="hint">Articles with the same series name are linked together</span>
+                    </div>
+                    <div class="field full">
+                      <label [for]="'ex-' + s.channel.id">Description</label>
+                      <textarea class="textarea" rows="2" [id]="'ex-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'excerpt')" (ngModelChange)="setOption(s.channel.id, 'excerpt', $event)" placeholder="Shown in feeds and link previews; defaults to the start of the article"></textarea>
+                    </div>
+                    }
                     } @else {
                     <div class="field">
                       <label [for]="'slug-' + s.channel.id">Slug</label>
@@ -304,7 +315,7 @@
                       <textarea class="textarea" rows="2" [id]="'ex-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'excerpt')" (ngModelChange)="setOption(s.channel.id, 'excerpt', $event)"></textarea>
                     </div>
                     }
-                    @if (s.channel.provider !== 'medium' && s.channel.provider !== 'ghost') {
+                    @if (s.channel.provider !== 'medium' && s.channel.provider !== 'ghost' && s.channel.provider !== 'devto') {
                     <div class="field">
                       <label [for]="'cat-' + s.channel.id">Categories</label>
                       <input class="input" [id]="'cat-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'categories')" (change)="setListOption(s.channel.id, 'categories', $any($event.target).value)" placeholder="News, Product" />
@@ -314,7 +325,7 @@
                     <div class="field">
                       <label [for]="'btags-' + s.channel.id">Tags</label>
                       <input class="input" [id]="'btags-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'tags')" (change)="setListOption(s.channel.id, 'tags', $any($event.target).value)" [placeholder]="tags().join(', ') || 'Defaults to post tags'" />
-                      <span class="hint">Comma separated; empty uses the post tags{{ s.channel.provider === 'medium' ? '. Medium keeps the first 3' : '' }}</span>
+                      <span class="hint">Comma separated; empty uses the post tags{{ s.channel.provider === 'medium' ? '. Medium keeps the first 3' : s.channel.provider === 'devto' ? '. DEV keeps the first 4, letters and digits only' : '' }}</span>
                     </div>
                     @if (s.channel.provider === 'ghost') {
                     <div class="field">

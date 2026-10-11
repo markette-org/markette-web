@@ -164,6 +164,7 @@ export type ProviderKey =
   | 'wordpress'
   | 'drupal'
   | 'medium'
+  | 'devto'
   | 'hugo';
 
 /** 'newsletter' = email lists (Brevo, Listmonk); the webhook integration reports 'social'. */
@@ -356,6 +357,8 @@ export interface TargetOptions {
   categories?: string[];
   tags?: string[];
   canonical_url?: string;
+  /** dev.to */
+  series?: string;
   // mastodon
   visibility?: 'public' | 'unlisted' | 'private' | 'direct';
   spoiler_text?: string;

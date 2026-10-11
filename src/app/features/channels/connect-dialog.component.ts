@@ -118,6 +118,15 @@ type CredValue = string | boolean;
                   </span>
                 </div>
               }
+              @case ('devto') {
+                <div class="notice accent small">
+                  <app-icon name="info" [size]="16" />
+                  <span>
+                    In dev.to open <strong>Settings → Extensions → DEV Community API Keys</strong> and generate a key. Articles use the post title,
+                    up to four tags and the first image as cover. Images are linked from this server, so they must be publicly reachable.
+                  </span>
+                </div>
+              }
               @case ('ghost') {
                 <div class="notice accent small">
                   <app-icon name="info" [size]="16" />
