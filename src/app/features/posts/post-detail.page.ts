@@ -235,7 +235,7 @@ export class PostDetailPage {
 
   /** "Published, but the first comment could not be posted: …" is a warning, not a failure. */
   protected isSoftError(t: Target): boolean {
-    return t.status === 'unconfirmed' || /^(Published, but|Marked as published)/i.test(t.last_error ?? '');
+    return t.status === 'unconfirmed' || /^(Published, but|Marked as published|Waiting for)/i.test(t.last_error ?? '');
   }
 
   /* --- post actions ---------------------------------------------------------- */
