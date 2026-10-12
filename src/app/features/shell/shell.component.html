@@ -27,6 +27,9 @@
             >
               <app-icon [name]="item.icon" [size]="18" />
               <span>{{ item.label }}</span>
+              @if (item.path === '/inbox' && inbox.summary()?.new) {
+                <span class="nav-badge" [attr.aria-label]="inbox.summary()!.new + ' new in the inbox'">{{ inbox.summary()!.new }}</span>
+              }
               @if (item.path === '/channels' && reauthCount()) {
                 <span class="nav-badge" [attr.aria-label]="reauthCount() + ' channels need reconnecting'">{{ reauthCount() }}</span>
               }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, DestroyRef, Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -16,6 +16,7 @@ import { ModalComponent } from '../../shared/components/modal.component';
 import { NewOrgDialogComponent } from '../organization/new-org-dialog.component';
 import { allTimezones } from '../../shared/utils/dates';
 import { Workspace } from '../../core/models';
+import { InboxService } from '../../core/inbox.service';
 
 interface NavItem {
   path: string;
@@ -41,12 +42,15 @@ export class ShellComponent implements OnInit {
   protected readonly isNativeApp = isNative();
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  protected readonly inbox = inject(InboxService);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly nav: NavItem[] = [
     { path: '/', label: 'Dashboard', icon: 'dashboard', exact: true },
     { path: '/compose', label: 'Compose', icon: 'compose', write: true },
     { path: '/calendar', label: 'Calendar', icon: 'calendar' },
     { path: '/posts', label: 'Posts', icon: 'posts' },
+    { path: '/inbox', label: 'Inbox', icon: 'inbox' },
     { path: '/analytics', label: 'Analytics', icon: 'analytics' },
     { path: '/best-times', label: 'Best times', icon: 'clock' },
     { path: '/campaigns', label: 'Campaigns', icon: 'flag' },
@@ -115,6 +119,11 @@ export class ShellComponent implements OnInit {
       error: () => undefined,
     });
     if (this.ws.active()) this.catalog.loadChannels().subscribe({ error: () => undefined });
+    if (this.ws.active()) this.inbox.refresh();
+    const timer = setInterval(() => {
+      if (this.ws.active() && document.visibilityState === 'visible') this.inbox.refresh();
+    }, 90_000);
+    this.destroyRef.onDestroy(() => clearInterval(timer));
     this.url.set(this.router.url);
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
       this.url.set(this.router.url);

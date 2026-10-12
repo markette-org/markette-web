@@ -72,6 +72,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/posts/posts.page').then((m) => m.PostsPage),
       },
       {
+        path: 'inbox',
+        title: 'Inbox · Markette',
+        loadComponent: () => import('./features/inbox/inbox.page').then((m) => m.InboxPage),
+      },
+      {
         path: 'calendar',
         title: 'Calendar · Markette',
         loadComponent: () => import('./features/calendar/calendar.page').then((m) => m.CalendarPage),

@@ -1145,3 +1145,34 @@ export interface ReviewLinkRow {
   active: boolean;
   decisions: number;
 }
+
+/* --- inbox ---------------------------------------------------------------------- */
+
+export interface InboxItem {
+  id: Id;
+  channel: Id;
+  channel_name: string;
+  provider: string;
+  kind: 'reply' | 'mention' | 'comment' | 'quote';
+  text: string;
+  url: string;
+  author_name: string;
+  author_handle: string;
+  author_avatar: string;
+  author_url: string;
+  remote_created_at: string | null;
+  target: Id | null;
+  post: Id | null;
+  post_title: string;
+  status: 'new' | 'read' | 'done';
+  reply_text: string;
+  reply_url: string;
+  replied_at: string | null;
+  replied_by_name: string | null;
+  can_reply: boolean;
+}
+
+export interface InboxSummary {
+  new: number;
+  channels: { channel: Id; name: string; provider: string; can_reply: boolean; last_polled_at: string | null; last_error: string }[];
+}
