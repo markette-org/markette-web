@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../core/api.service';
@@ -34,6 +35,7 @@ const MODE_LABEL: Record<string, string> = {
 @Component({
   selector: 'app-post-detail-page',
   imports: [
+    FormsModule,
     RouterLink,
     IconComponent,
     ChannelBadgeComponent,
@@ -335,6 +337,44 @@ export class PostDetailPage {
         this.reloadQuietly();
       },
       error: (err) => this.toast.error('Could not cancel', err),
+    });
+  }
+
+  protected readonly editing = signal<Target | null>(null);
+  protected editBody = '';
+  protected editTitle = '';
+
+  protected canEditRemote(t: Target): boolean {
+    return this.ws.canWrite() && t.status === 'published' && !!this.catalog.provider(t.channel_detail.provider)?.supports_edit;
+  }
+
+  protected editingTitle(t: Target): boolean {
+    const p = this.catalog.provider(t.channel_detail.provider);
+    return !!p?.supports_title || p?.kind === 'blog';
+  }
+
+  protected startEdit(t: Target) {
+    const p = this.post();
+    this.editBody = t.body || p?.body || '';
+    this.editTitle = t.title || p?.title || '';
+    this.editing.set(t);
+  }
+
+  protected saveEdit(t: Target) {
+    this.resolving.set(t.id);
+    const patch: { body: string; title?: string } = { body: this.editBody };
+    if (this.editingTitle(t)) patch.title = this.editTitle;
+    this.posts.editRemote(t.id, patch).subscribe({
+      next: (res) => {
+        this.resolving.set(null);
+        this.editing.set(null);
+        this.patchTarget(res);
+        this.toast.success(`Updated on ${t.channel_detail.provider_label}`);
+      },
+      error: (err) => {
+        this.resolving.set(null);
+        this.toast.error('Not updated', err);
+      },
     });
   }
 

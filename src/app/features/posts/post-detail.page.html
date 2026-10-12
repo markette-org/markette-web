@@ -336,6 +336,29 @@
             }
           }
 
+          @if (editing()?.id === t.id) {
+            <form class="check" (ngSubmit)="saveEdit(t)">
+              @if (editingTitle(t)) {
+                <label class="small" [for]="'et-' + t.id">Title</label>
+                <input class="input" [id]="'et-' + t.id" name="title" [(ngModel)]="editTitle" />
+              }
+              <label class="small" [for]="'eb-' + t.id">Text on {{ t.channel_detail.name }}</label>
+              <textarea class="textarea" rows="6" [id]="'eb-' + t.id" name="body" [(ngModel)]="editBody"></textarea>
+              <span class="hint">Changes the live post; media stay as they are. Other channels are not touched.</span>
+              <div class="row-wrap">
+                <button type="submit" class="btn sm primary" [disabled]="resolving() === t.id">
+                  @if (resolving() === t.id) {
+                    <span class="spinner"></span>
+                  }
+                  Save on {{ t.channel_detail.provider_label }}
+                </button>
+                <button type="button" class="btn sm ghost" (click)="editing.set(null)">Cancel</button>
+              </div>
+            </form>
+          }
+          @if (t.extra?.['edited_at']) {
+            <p class="tiny muted">Edited {{ $any(t.extra?.['edited_at']) | relTime }}</p>
+          }
           <footer class="t-foot">
             @if (t.external_url) {
               <a class="btn sm" [href]="t.external_url" target="_blank" rel="noopener"><app-icon name="external" [size]="14" /> View on {{ t.channel_detail.provider_label }}</a>
@@ -359,6 +382,9 @@
               >
                 <app-icon name="link" [size]="14" /> Announce
               </a>
+            }
+            @if (canEditRemote(t)) {
+              <button type="button" class="btn sm ghost" (click)="startEdit(t)"><app-icon name="edit" [size]="14" /> Edit on {{ t.channel_detail.provider_label }}</button>
             }
             <div class="spacer"></div>
             @if (canCancel(t)) {

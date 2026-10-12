@@ -544,6 +544,17 @@
                 </fieldset>
               }
 
+              @if (s.provider?.supports_edit) {
+                <label class="switch">
+                  <input type="checkbox" [checked]="optionFlag(s.channel.id, 'backlinks')" (change)="setOption(s.channel.id, 'backlinks', $any($event.target).checked || undefined)" [disabled]="s.locked" />
+                  <span class="track"></span>
+                  <span>
+                    <strong>Link back to its announcements</strong>
+                    <span class="block hint">Once the posts announcing this one (made with <em>Announce</em> or <em>Wait for another publication</em>) are live, "Discuss this post on Bluesky · X" with their links is added at the end, by editing it on {{ s.provider?.label }}.</span>
+                  </span>
+                </label>
+              }
+
               <fieldset class="options" [disabled]="s.locked">
                 <legend>Wait for another publication</legend>
                 <div class="form-grid">

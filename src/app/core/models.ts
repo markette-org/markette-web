@@ -213,6 +213,8 @@ export interface Provider {
   first_comment_max?: number | null;
   /** X, Bluesky, Mastodon, Threads: long text can go out as a thread. */
   supports_threads?: boolean;
+  /** Published posts can be edited from Markette. */
+  supports_edit?: boolean;
   credential_fields: CredentialField[];
 }
 
@@ -390,6 +392,8 @@ export interface TargetOptions {
   thread?: boolean;
   /** default true: "i/n" at the end of each post */
   thread_numbering?: boolean;
+  /** Add "Discuss this post on …" links to this publication once its announcements are live. */
+  backlinks?: boolean;
   // first comment (LinkedIn, Facebook, Instagram)
   first_comment?: string;
   /** undefined = channel default (config.links_in_first_comment) */
