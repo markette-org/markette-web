@@ -63,6 +63,34 @@ import { allTimezones } from '../../shared/utils/dates';
             }
           </div>
         </div>
+
+        <fieldset class="stack-sm tracking">
+          <legend><strong>Link tracking</strong> <span class="muted small">— on social posts only; blogs and newsletters keep clean links</span></legend>
+          <label class="switch">
+            <input type="checkbox" name="utm" [(ngModel)]="utm" [disabled]="!ws.isAdmin()" />
+            <span class="track"></span>
+            <span><strong>UTM tags</strong> — adds utm_source (the network), utm_medium, utm_campaign (the post's campaign) and utm_content (the post) to your links.</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" name="short" [(ngModel)]="shortLinks" [disabled]="!ws.isAdmin()" />
+            <span class="track"></span>
+            <span><strong>Short links</strong> — replaces them with a short link on this server that counts clicks per publication (link previews and bots are not counted).</span>
+          </label>
+          <div class="form-grid">
+            <div class="field">
+              <label for="w-medium">utm_medium</label>
+              <input id="w-medium" name="medium" class="input mono" [(ngModel)]="utmMedium" [disabled]="!ws.isAdmin() || !utm()" [class.invalid]="fe()['link_tracking']" />
+            </div>
+            <div class="field">
+              <label for="w-domains">Your sites</label>
+              <input id="w-domains" name="domains" class="input mono" [(ngModel)]="domains" [disabled]="!ws.isAdmin()" placeholder="acme.org, shop.acme.org" />
+              <span class="hint">Links to these domains (and their subdomains) are tracked. Empty: only the post's own link.</span>
+            </div>
+          </div>
+          @if (fe()['link_tracking']) {
+            <span class="error">{{ fe()['link_tracking'] }}</span>
+          }
+        </fieldset>
         @if (general()) {
           <div class="form-error" role="alert">{{ general() }}</div>
         }
@@ -90,6 +118,14 @@ import { allTimezones } from '../../shared/utils/dates';
     }
   `,
   styles: `
+    .tracking {
+      border: 0;
+      padding: 0;
+      margin: 8px 0 0;
+    }
+    .tracking legend {
+      margin-bottom: 6px;
+    }
     .danger-zone {
       margin-top: 16px;
       border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
@@ -112,6 +148,10 @@ export class WorkspaceSectionComponent {
   protected readonly timezone = signal('UTC');
   protected readonly gap = signal(0);
   protected readonly ai = signal(false);
+  protected readonly utm = signal(false);
+  protected readonly shortLinks = signal(false);
+  protected readonly utmMedium = signal('social');
+  protected readonly domains = signal('');
   protected readonly saving = signal(false);
   protected readonly fe = signal<Record<string, string>>({});
   protected readonly general = signal('');
@@ -124,6 +164,11 @@ export class WorkspaceSectionComponent {
       this.timezone.set(w.timezone);
       this.gap.set(w.min_gap_minutes);
       this.ai.set(w.ai_enabled);
+      const lt = w.link_tracking ?? {};
+      this.utm.set(!!lt.utm);
+      this.shortLinks.set(!!lt.short_links);
+      this.utmMedium.set(lt.utm_medium || 'social');
+      this.domains.set((lt.domains ?? []).join(', '));
     });
   }
 
@@ -139,6 +184,15 @@ export class WorkspaceSectionComponent {
         timezone: this.timezone(),
         min_gap_minutes: Number(this.gap()) || 0,
         ai_enabled: this.ai(),
+        link_tracking: {
+          utm: this.utm(),
+          short_links: this.shortLinks(),
+          utm_medium: this.utmMedium().trim() || 'social',
+          domains: this.domains()
+            .split(/[\s,;]+/)
+            .map((d) => d.trim())
+            .filter(Boolean),
+        },
       })
       .subscribe({
         next: () => {

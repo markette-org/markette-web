@@ -287,6 +287,9 @@
               }
             </p>
           }
+          @if (t.link_clicks) {
+            <p class="small muted"><app-icon name="link" [size]="14" /> {{ t.link_clicks | num }} {{ t.link_clicks === 1 ? 'click' : 'clicks' }} on its short link</p>
+          }
           @if (metricTiles(t.metrics).length) {
             <div class="metrics">
               @for (m of metricTiles(t.metrics); track m.key) {

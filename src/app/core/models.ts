@@ -46,6 +46,8 @@ export interface Workspace {
   ai_enabled: boolean;
   /** Server-wide AI switch (settings.AI_ENABLED). */
   ai_available?: boolean;
+  /** UTM tags and short links on social posts. */
+  link_tracking?: LinkTracking;
   role: Role | null;
   organization?: Id;
   organization_name?: string;
@@ -54,6 +56,14 @@ export interface Workspace {
   is_archived?: boolean;
   archived_at?: string | null;
   created_at: string;
+}
+
+export interface LinkTracking {
+  utm?: boolean;
+  utm_medium?: string;
+  short_links?: boolean;
+  /** The workspace's own sites; empty = only the post's link. */
+  domains?: string[];
 }
 
 /* --- Organizations ---------------------------------------------------------- */
@@ -424,6 +434,8 @@ export interface Target {
   external_url: string;
   last_error: string;
   metrics: Metrics;
+  /** Clicks on its short links. */
+  link_clicks?: number;
   metrics_updated_at: string | null;
   /** Provider extras, e.g. first_comment_id once the first comment is posted. */
   extra?: { first_comment_id?: string; [key: string]: unknown };
@@ -566,6 +578,8 @@ export interface MetricTotals {
   shares: number;
   saves: number;
   clicks: number;
+  /** Clicks on Markette short links (people only, link previews excluded). */
+  link_clicks: number;
   posts: number;
   engagements: number;
 }
@@ -583,6 +597,7 @@ export interface ChannelAnalytics {
   shares: number;
   saves: number;
   clicks: number;
+  link_clicks: number;
   avg_engagement_rate: number | null;
 }
 
@@ -602,6 +617,7 @@ export interface TopPost {
   url: string;
   published_at: string;
   metrics: Metrics;
+  link_clicks: number;
 }
 
 export interface AnalyticsOverview {

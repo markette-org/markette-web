@@ -165,6 +165,7 @@ const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
                 <th class="num">Likes</th>
                 <th class="num">Comments</th>
                 <th class="num">Shares</th>
+                <th class="num" title="Clicks on short links">Link clicks</th>
                 <th class="num">Avg. eng. rate</th>
               </tr>
             </thead>
@@ -180,11 +181,12 @@ const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
                   <td class="num">{{ c.likes | num }}</td>
                   <td class="num">{{ c.comments | num }}</td>
                   <td class="num">{{ c.shares | num }}</td>
+                  <td class="num">{{ c.link_clicks | num }}</td>
                   <td class="num">{{ c.avg_engagement_rate | pct: 2 }}</td>
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="8" class="muted" style="text-align: center; padding: 24px">No channel published in this period.</td>
+                  <td colspan="9" class="muted" style="text-align: center; padding: 24px">No channel published in this period.</td>
                 </tr>
               }
             </tbody>
@@ -332,7 +334,12 @@ export class AnalyticsPage implements OnInit {
       { label: 'Engagements', icon: 'heart', value: t?.engagements ?? null, foot: t ? `${t.likes} likes · ${t.comments} comments · ${t.shares} shares` : '' },
       { label: 'Impressions', icon: 'eye', value: t?.impressions ?? null, foot: t?.reach ? `Reach ${t.reach}` : '' },
       { label: 'Publications', icon: 'send', value: t?.posts ?? null, foot: o ? `${o.scheduled} scheduled next` : '' },
-      { label: 'Clicks', icon: 'link', value: t?.clicks ?? null, foot: t?.saves ? `${t.saves} saves` : '' },
+      {
+        label: 'Clicks',
+        icon: 'link',
+        value: t ? (t.clicks || 0) + (t.link_clicks || 0) : null,
+        foot: t ? [t.link_clicks ? `${t.link_clicks} on short links` : '', t.clicks ? `${t.clicks} reported by networks` : '', t.saves ? `${t.saves} saves` : ''].filter(Boolean).join(' · ') : '',
+      },
     ];
   });
 
