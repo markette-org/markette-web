@@ -345,6 +345,22 @@ const YOUTUBE_CATEGORIES: Record<string, string> = {
                     Sync
                   </button>
                 }
+                @if (ws.canWrite() && catalog.provider(ch.provider)?.history && ch.status === 'active') {
+                  <button
+                    type="button"
+                    class="btn sm ghost"
+                    (click)="importHistory(ch)"
+                    [disabled]="importing().has(ch.id)"
+                    title="Bring in this account's latest posts and their numbers, so analytics and best times start with data"
+                  >
+                    @if (importing().has(ch.id)) {
+                      <span class="spinner"></span>
+                    } @else {
+                      <app-icon name="upload" [size]="14" />
+                    }
+                    Import past posts
+                  </button>
+                }
                 <span class="spacer"></span>
                 @if (ws.isAdmin() && ch.status === 'needs_reauth') {
                   <button type="button" class="btn sm primary" (click)="reconnect(ch)">Reconnect</button>
@@ -642,6 +658,45 @@ export class ChannelsPage implements OnInit {
     this.preset.set(ch.provider);
     this.presetServer.set(ch.provider === 'mastodon' ? ch.base_url : '');
     this.connectOpen.set(true);
+  }
+
+  protected readonly importing = signal(new Set<number>());
+
+  protected importHistory(ch: Channel) {
+    this.importing.update((s) => new Set(s).add(ch.id));
+    const done = () =>
+      this.importing.update((s) => {
+        const n = new Set(s);
+        n.delete(ch.id);
+        return n;
+      });
+    type Job = { status: string; imported: number; found: number; error: string } | null;
+    const poll = (attempt: number) => {
+      this.api.get<Job>(`channels/${ch.id}/import-history/`).subscribe({
+        next: (job) => {
+          if (job && (job.status === 'queued' || job.status === 'running') && attempt < 40) {
+            setTimeout(() => poll(attempt + 1), 3000);
+            return;
+          }
+          done();
+          if (!job) return;
+          if (job.status === 'done')
+            this.toast.success(
+              job.imported ? `Imported ${job.imported} posts from ${ch.name}` : `Nothing new to import from ${ch.name}`,
+              job.imported ? 'Their numbers appear in Analytics as they are collected; best times were updated.' : '',
+            );
+          else if (job.status === 'failed') this.toast.error(`Import from ${ch.name} failed`, job.error);
+        },
+        error: () => done(),
+      });
+    };
+    this.api.post<Job>(`channels/${ch.id}/import-history/`, { limit: 200 }).subscribe({
+      next: () => poll(0),
+      error: (err) => {
+        done();
+        this.toast.error(`Could not import from ${ch.name}`, err);
+      },
+    });
   }
 
   protected sync(ch: Channel) {

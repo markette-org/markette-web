@@ -18,6 +18,9 @@
       <div style="min-width: 0">
         <div class="row-wrap" style="margin-bottom: 8px">
           <app-status-chip [status]="p.status" />
+            @if (p.imported) {
+              <span class="chip outline" title="Published outside Markette and imported from the channel's history">Imported</span>
+            }
           <app-approval-chip [status]="p.approval_status" />
           @if (campaign(); as c) {
             <a class="chip outline" [routerLink]="['/campaigns', c.id]"><span class="color-dot" [style.background]="c.color"></span>{{ c.name }}</a>

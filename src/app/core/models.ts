@@ -215,6 +215,11 @@ export interface Provider {
   supports_threads?: boolean;
   /** Published posts can be edited from Markette. */
   supports_edit?: boolean;
+  /** Replies and comments are collected into the inbox (and can be answered). */
+  inbox?: boolean;
+  inbox_reply?: boolean;
+  /** Past posts can be imported. */
+  history?: boolean;
   credential_fields: CredentialField[];
 }
 
@@ -474,6 +479,8 @@ export interface FollowedTarget {
 
 export interface Post {
   id: Id;
+  /** Brought in from a channel's history (published outside Markette). */
+  imported?: boolean;
   title: string;
   body: string;
   link: string;

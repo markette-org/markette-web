@@ -106,6 +106,9 @@
               </a>
               <div class="meta row-wrap">
                 <app-status-chip [status]="p.status" />
+            @if (p.imported) {
+              <span class="chip outline" title="Published outside Markette and imported from the channel's history">Imported</span>
+            }
                 <app-approval-chip [status]="p.approval_status" [title]="approvalTitle(p)" />
                 @if (p.campaign && catalog.campaignMap().get(p.campaign); as c) {
                   <span class="chip outline"><span class="color-dot" [style.background]="c.color"></span>{{ c.name }}</span>
