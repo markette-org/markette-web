@@ -149,6 +149,14 @@ const KIND_LABEL: Record<string, string> = { reply: 'replied', mention: 'mention
       align-items: center;
       margin-bottom: 16px;
     }
+    .filters .select {
+      width: auto;
+      min-width: 180px;
+    }
+    .filters .input {
+      flex: 1 1 200px;
+      width: auto;
+    }
     .grow {
       flex: 1;
       min-width: 0;
