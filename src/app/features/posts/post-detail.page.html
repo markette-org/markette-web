@@ -287,6 +287,19 @@
               }
             </p>
           }
+          @if (thread(t); as th) {
+            <p class="small muted row-wrap">
+              <app-icon name="layers" [size]="14" /> Thread: {{ th.posted }} of {{ th.total }} posts published
+              @if (th.posted < th.total && ws.canWrite()) {
+                <button type="button" class="btn sm" (click)="continueThread(t)" [disabled]="resolving() === t.id">
+                  @if (resolving() === t.id) {
+                    <span class="spinner"></span>
+                  }
+                  Continue the thread
+                </button>
+              }
+            </p>
+          }
           @if (t.link_clicks) {
             <p class="small muted"><app-icon name="link" [size]="14" /> {{ t.link_clicks | num }} {{ t.link_clicks === 1 ? 'click' : 'clicks' }} on its short link</p>
           }

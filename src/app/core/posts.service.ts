@@ -85,6 +85,9 @@ export class PostsService {
   resolveTarget(id: Id, published: boolean, url = ''): Observable<Target> {
     return this.api.post<Target>(`targets/${id}/resolve/`, published ? { published, url } : { published });
   }
+  continueThread(id: Id): Observable<Target> {
+    return this.api.post<Target>(`targets/${id}/continue-thread/`);
+  }
   deleteRemote(id: Id): Observable<Target> {
     return this.api.post<Target>(`targets/${id}/delete-remote/`);
   }

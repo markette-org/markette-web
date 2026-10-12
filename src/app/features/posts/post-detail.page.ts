@@ -338,6 +338,28 @@ export class PostDetailPage {
     });
   }
 
+  protected thread(t: Target): { posted: number; total: number } | null {
+    const th = (t.extra as { thread?: { total: number; posts: unknown[] } } | null)?.thread;
+    return th ? { posted: th.posts.length, total: th.total } : null;
+  }
+
+  protected continueThread(t: Target) {
+    this.resolving.set(t.id);
+    this.posts.continueThread(t.id).subscribe({
+      next: (res) => {
+        this.resolving.set(null);
+        this.patchTarget(res);
+        const th = this.thread(res);
+        if (th && th.posted >= th.total) this.toast.success('Thread completed');
+        else this.toast.error('The thread stopped again', res.last_error);
+      },
+      error: (err) => {
+        this.resolving.set(null);
+        this.toast.error('Could not continue the thread', err);
+      },
+    });
+  }
+
   protected resolveTarget(t: Target, published: boolean, url = '') {
     this.resolving.set(t.id);
     this.posts.resolveTarget(t.id, published, url.trim()).subscribe({

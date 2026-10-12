@@ -45,6 +45,8 @@ export interface ChannelState {
   title: string; // effective
   count: number;
   max: number | null;
+  /** Posts in the thread (1 = not a thread). */
+  threadParts: number;
   problems: string[];
   /** existing target on this post, if any */
   targetId: Id | null;

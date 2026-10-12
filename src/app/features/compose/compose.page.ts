@@ -45,7 +45,7 @@ import { StatusChipComponent } from '../../shared/components/status-chip.compone
 import { localInputToIso, toLocalInput, tzAbbrev } from '../../shared/utils/dates';
 import { fmtBytes } from '../../shared/utils/format';
 import { channelColor, providerMeta } from '../../shared/utils/providers';
-import { measure, countCodepoints } from '../../shared/utils/text-count';
+import { countCodepoints, measure, splitThread } from '../../shared/utils/text-count';
 import { splitFirstComment } from '../../shared/utils/first-comment';
 import { RelativeTimePipe } from '../../shared/pipes/tz-date.pipe';
 import { ComposePreviewComponent } from './compose-preview.component';
@@ -250,8 +250,11 @@ export class ComposePage implements OnInit {
             postedText = '';
           }
         }
-        const count = measure(postedText, provider?.count_mode ?? 'chars');
         const max = provider?.max_chars ?? null;
+        const mode = provider?.count_mode ?? 'chars';
+        // A thread is checked post by post: the longest one counts.
+        const parts = provider?.supports_threads && d.options.thread && max ? splitThread(postedText, max, mode, d.options.thread_numbering ?? true) : [postedText];
+        const count = Math.max(...parts.map((p) => measure(p, mode)));
         const problems: string[] = [];
         if (max && count > max) problems.push(`Text is ${count - max} over the ${max}-character limit.`);
         if (firstComment?.max && firstComment.count > firstComment.max)
@@ -307,6 +310,7 @@ export class ComposePage implements OnInit {
           title,
           count,
           max,
+          threadParts: parts.length,
           problems,
           targetId: target?.id ?? null,
           targetStatus,

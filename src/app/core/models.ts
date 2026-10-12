@@ -211,6 +211,8 @@ export interface Provider {
   /** LinkedIn, Facebook, Instagram: a first comment can be posted under the publication. */
   supports_first_comment?: boolean;
   first_comment_max?: number | null;
+  /** X, Bluesky, Mastodon, Threads: long text can go out as a thread. */
+  supports_threads?: boolean;
   credential_fields: CredentialField[];
 }
 
@@ -384,6 +386,10 @@ export interface TargetOptions {
   language?: string;
   // bluesky
   langs?: string[];
+  // threads (X, Bluesky, Mastodon, Threads): split long text into replies
+  thread?: boolean;
+  /** default true: "i/n" at the end of each post */
+  thread_numbering?: boolean;
   // first comment (LinkedIn, Facebook, Instagram)
   first_comment?: string;
   /** undefined = channel default (config.links_in_first_comment) */

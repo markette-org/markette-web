@@ -231,6 +231,21 @@
                   [placeholder]="body() || 'Leave empty to use the shared text'"
                   [disabled]="s.locked"
                 ></textarea>
+                @if (s.provider?.supports_threads && !s.locked) {
+                  <label class="switch thread-switch">
+                    <input type="checkbox" [checked]="optionFlag(s.channel.id, 'thread')" (change)="setOption(s.channel.id, 'thread', $any($event.target).checked || undefined)" />
+                    <span class="track"></span>
+                    <span>
+                      <strong>Post as a thread</strong>
+                      @if (s.threadParts > 1) {
+                        — {{ s.threadParts }} posts, numbered 1/{{ s.threadParts }}
+                      } @else {
+                        when it is longer than {{ s.max }} characters
+                      }
+                      <span class="block hint">Breaks at lines with <code>---</code>, otherwise between paragraphs and sentences. Images go on the first post.</span>
+                    </span>
+                  </label>
+                }
                 <div class="row-wrap">
                   <span class="hint">Leave blank to use the shared text.</span>
                   @if (!draft(s.channel.id).body && body()) {

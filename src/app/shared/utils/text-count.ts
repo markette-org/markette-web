@@ -76,3 +76,68 @@ export function measure(text: string, mode: CountMode = 'chars'): number {
       return countCodepoints(text);
   }
 }
+
+const SEPARATOR_RE = /^[ \t]*---+[ \t]*$/m;
+
+/**
+ * Mirrors the backend's split_thread: posts of at most `limit`, broken at `---` lines, else by
+ * paragraph, sentence, then word; numbered "i/n" when there is more than one.
+ */
+export function splitThread(text: string, limit: number, mode: CountMode = 'chars', numbering = true): string[] {
+  const reserve = numbering ? '\n\n99/99'.length : 0;
+  const budget = Math.max(limit - reserve, 20);
+  const fits = (s: string) => measure(s, mode) <= budget;
+  const pack = (pieces: string[], joiner: string): string[] => {
+    const out: string[] = [];
+    let cur = '';
+    for (const piece of pieces) {
+      const cand = cur ? `${cur}${joiner}${piece}` : piece;
+      if (fits(cand)) {
+        cur = cand;
+        continue;
+      }
+      if (cur) out.push(cur);
+      cur = '';
+      if (fits(piece)) cur = piece;
+      else out.push(...chunks(piece));
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const chunks = (block: string): string[] => {
+    const sentences = block.split(/(?<=[.!?…])\s+/).filter(Boolean);
+    if (sentences.length > 1) return pack(sentences, ' ');
+    const words = block.split(' ');
+    if (words.length > 1) return pack(words, ' ');
+    const cut: string[] = [];
+    let rest = block;
+    while (rest) {
+      let n = rest.length;
+      while (n > 1 && !fits(rest.slice(0, n))) n--;
+      cut.push(rest.slice(0, n));
+      rest = rest.slice(n);
+    }
+    return cut;
+  };
+  let posts: string[];
+  if (SEPARATOR_RE.test(text)) {
+    posts = [];
+    for (const raw of text.split(new RegExp(SEPARATOR_RE.source, 'gm'))) {
+      const block = raw.trim();
+      if (block) posts.push(...(fits(block) ? [block] : pack(block.split(/\n\s*\n/), '\n\n')));
+    }
+  } else if (measure(text, mode) <= limit) {
+    return [text];
+  } else {
+    posts = pack(
+      text
+        .trim()
+        .split(/\n\s*\n/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+      '\n\n',
+    );
+  }
+  if (numbering && posts.length > 1) posts = posts.map((p, i) => `${p}\n\n${i + 1}/${posts.length}`);
+  return posts;
+}
