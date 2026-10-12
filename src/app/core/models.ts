@@ -1047,3 +1047,48 @@ export interface RedditRequirements {
   guidelines_text?: string;
   [key: string]: unknown;
 }
+
+/* --- notifications ------------------------------------------------------------- */
+
+export type NotificationKind = 'email' | 'telegram' | 'webhook';
+
+export interface NotificationDestination {
+  id: Id;
+  kind: NotificationKind;
+  name: string;
+  events: string[];
+  enabled: boolean;
+  /** email: { to: string[] }; telegram: { chat_id, chat_title }; webhook: { url } */
+  config: { to?: string[]; chat_id?: string | number; chat_title?: string; url?: string };
+  has_bot_token: boolean;
+  last_sent_at: string | null;
+  last_error: string;
+  failures: number;
+  created_at: string;
+  /** Only in the response that creates a webhook. */
+  signing_secret?: string;
+}
+
+export interface NotificationCatalog {
+  events: { value: string; label: string }[];
+  default_events: string[];
+  kinds: { value: NotificationKind; label: string }[];
+  email_configured: boolean;
+}
+
+export interface NotificationDelivery {
+  uid: string;
+  event: string;
+  status: 'pending' | 'sent' | 'failed';
+  attempts: number;
+  response_status: number | null;
+  error: string;
+  created_at: string;
+  sent_at: string | null;
+  next_attempt_at: string | null;
+}
+
+export interface TelegramChats {
+  bot: string;
+  chats: { id: number; title: string; type: string }[];
+}

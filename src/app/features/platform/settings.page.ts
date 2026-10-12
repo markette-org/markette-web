@@ -21,7 +21,7 @@ import { RelativeTimePipe, TzDatePipe } from '../../shared/pipes/tz-date.pipe';
 import { PlatformHeaderComponent } from './platform-header.component';
 import { copyText } from './platform-utils';
 
-type SectionKey = 'general' | 'announcement' | 'signups' | 'plan' | 'publishing' | 'ai' | 'x' | 'linkedin' | 'meta' | 'threads' | 'reddit' | 'slack' | 'youtube' | 'mastodon' | 'billing';
+type SectionKey = 'general' | 'announcement' | 'signups' | 'plan' | 'publishing' | 'ai' | 'x' | 'linkedin' | 'meta' | 'threads' | 'reddit' | 'slack' | 'youtube' | 'mastodon' | 'billing' | 'email';
 type LimitKey = 'default_max_workspaces' | 'default_max_channels' | 'default_max_members' | 'default_ai_monthly_tokens';
 
 interface OverrideField {
@@ -35,6 +35,13 @@ interface OverrideField {
 }
 
 const SECTION_OVERRIDES: Partial<Record<SectionKey, OverrideField[]>> = {
+  email: [
+    { name: 'EMAIL_HOST', label: 'SMTP server', kind: 'text', hint: 'e.g. smtp.postmarkapp.com. Leave empty to turn email notifications off.' },
+    { name: 'EMAIL_PORT', label: 'Port', kind: 'number', min: 1, max: 65535, step: '1', hint: '587 with STARTTLS, usually.' },
+    { name: 'EMAIL_HOST_USER', label: 'Username', kind: 'text' },
+    { name: 'EMAIL_USE_TLS', label: 'STARTTLS', kind: 'bool' },
+    { name: 'DEFAULT_FROM_EMAIL', label: 'From address', kind: 'text', hint: 'e.g. Markette <noreply@example.org>. The domain should be verified with your provider.' },
+  ],
   publishing: [
     { name: 'PUBLISH_MAX_ATTEMPTS', label: 'Max publish attempts', kind: 'number', min: 1, max: 20, step: '1', hint: 'Retries with back-off before a publication is marked failed (1–20).' },
   ],
@@ -105,6 +112,7 @@ const SECTION_SECRETS: Partial<Record<SectionKey, { name: string; label: string 
   reddit: [{ name: 'REDDIT_CLIENT_SECRET', label: 'Client secret' }],
   slack: [{ name: 'SLACK_CLIENT_SECRET', label: 'Client secret' }],
   youtube: [{ name: 'GOOGLE_CLIENT_SECRET', label: 'OAuth client secret' }],
+  email: [{ name: 'EMAIL_HOST_PASSWORD', label: 'SMTP password' }],
   billing: [
     { name: 'STRIPE_SECRET_KEY', label: 'Secret key' },
     { name: 'STRIPE_WEBHOOK_SECRET', label: 'Webhook signing secret' },
@@ -245,7 +253,7 @@ export class PlatformSettingsPage implements OnInit {
     out.announcement = this.announcement() !== (d.announcement || '') || this.level() !== d.announcement_level;
     out.signups = this.signupsOpen() !== d.signups_open || this.orgCreationOpen() !== d.org_creation_open || this.domains().join(', ') !== this.splitDomains(d.signup_domains).join(', ');
     out.plan = LIMITS.some(({ key }) => this.limitValue(key) !== d[key]);
-    for (const key of ['publishing', 'ai', 'x', 'linkedin', 'meta', 'threads', 'reddit', 'slack', 'youtube', 'mastodon', 'billing'] as SectionKey[]) {
+    for (const key of ['publishing', 'ai', 'x', 'linkedin', 'meta', 'threads', 'reddit', 'slack', 'youtube', 'mastodon', 'billing', 'email'] as SectionKey[]) {
       const fields = SECTION_OVERRIDES[key] ?? [];
       let changed = fields.some((f) => this.ovr()[f.name] !== overrideToDraft(d.overrides[f.name]?.value, f.kind));
       changed ||= (SECTION_SECRETS[key] ?? []).some((s) => !!this.secretDraft()[s.name]?.trim());

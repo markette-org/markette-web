@@ -21,6 +21,7 @@
         <a href="#plan" (click)="$event.preventDefault(); scrollTo('plan')">Default plan</a>
         <a href="#publishing" (click)="$event.preventDefault(); scrollTo('publishing')">Publishing</a>
         <a href="#ai" (click)="$event.preventDefault(); scrollTo('ai')">AI assistant</a>
+        <a href="#email" (click)="$event.preventDefault(); scrollTo('email')">Email</a>
         <a href="#billing" (click)="$event.preventDefault(); scrollTo('billing')">Billing (Stripe)</a>
         <a href="#networks" (click)="$event.preventDefault(); scrollTo('networks')">Network apps</a>
       </nav>
@@ -342,6 +343,22 @@
             }
           </div>
           <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'ai' }" />
+        </section>
+
+        <!-- Email -->
+        <section class="card" id="email" aria-labelledby="h-email">
+          <ng-container [ngTemplateOutlet]="head" [ngTemplateOutletContext]="{ id: 'h-email', title: 'Email', key: 'email', text: 'SMTP server for notification emails (failures, approvals, daily summaries). Workspaces set up who receives what under Settings → Notifications.' }" />
+          <div class="form-grid">
+            @for (f of overrideFields.email ?? []; track f.name) {
+              <ng-container [ngTemplateOutlet]="ovrTpl" [ngTemplateOutletContext]="{ $implicit: f, section: 'email' }" />
+            }
+          </div>
+          <div class="stack" style="margin-top: 12px">
+            @for (s of secretFields.email ?? []; track s.name) {
+              <ng-container [ngTemplateOutlet]="secretTpl" [ngTemplateOutletContext]="{ $implicit: s, section: 'email' }" />
+            }
+          </div>
+          <ng-container [ngTemplateOutlet]="foot" [ngTemplateOutletContext]="{ key: 'email' }" />
         </section>
 
         <!-- Billing -->
