@@ -6,15 +6,16 @@ import { ApiMcpSectionComponent } from './api-mcp-section.component';
 import { MembersSectionComponent } from './members-section.component';
 import { NotificationsSectionComponent } from './notifications-section.component';
 import { ProfileSectionComponent } from './profile-section.component';
+import { ReportsSectionComponent } from './reports-section.component';
 import { SlotsSectionComponent } from './slots-section.component';
 import { TeamsSectionComponent } from './teams-section.component';
 import { WorkspaceSectionComponent } from './workspace-section.component';
 
-type Tab = 'workspace' | 'queue' | 'members' | 'teams' | 'notifications' | 'profile' | 'api';
+type Tab = 'workspace' | 'queue' | 'members' | 'teams' | 'notifications' | 'reports' | 'profile' | 'api';
 
 @Component({
   selector: 'app-settings-page',
-  imports: [IconComponent, WorkspaceSectionComponent, SlotsSectionComponent, MembersSectionComponent, TeamsSectionComponent, NotificationsSectionComponent, ProfileSectionComponent, ApiMcpSectionComponent],
+  imports: [IconComponent, WorkspaceSectionComponent, SlotsSectionComponent, MembersSectionComponent, TeamsSectionComponent, NotificationsSectionComponent, ReportsSectionComponent, ProfileSectionComponent, ApiMcpSectionComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page">
@@ -22,7 +23,7 @@ type Tab = 'workspace' | 'queue' | 'members' | 'teams' | 'notifications' | 'prof
         <div>
           <div class="eyebrow">{{ ws.active()?.name }}</div>
           <h1>Settings</h1>
-          <p class="subtitle">Workspace preferences, posting queue, members, teams, notifications, your profile and API access.</p>
+          <p class="subtitle">Workspace preferences, posting queue, members, teams, notifications, reports, your profile and API access.</p>
         </div>
       </header>
 
@@ -58,6 +59,9 @@ type Tab = 'workspace' | 'queue' | 'members' | 'teams' | 'notifications' | 'prof
           @case ('notifications') {
             <app-notifications-section />
           }
+          @case ('reports') {
+            <app-reports-section />
+          }
           @case ('profile') {
             <app-profile-section />
           }
@@ -86,6 +90,7 @@ export class SettingsPage implements OnInit {
     { id: 'members', label: 'Members', icon: 'user' },
     { id: 'teams', label: 'Teams', icon: 'users' },
     { id: 'notifications', label: 'Notifications', icon: 'bell' },
+    { id: 'reports', label: 'Reports', icon: 'analytics' },
     { id: 'profile', label: 'Profile', icon: 'user' },
     { id: 'api', label: 'API & MCP', icon: 'lock' },
   ];

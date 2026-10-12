@@ -39,6 +39,7 @@
           @if (p.status === 'scheduled') {
             <button type="button" class="btn" (click)="unschedule()" [disabled]="busy()"><app-icon name="pause" [size]="16" /> Unschedule</button>
           }
+          <button type="button" class="btn" (click)="toggleReviewLinks()" [attr.aria-expanded]="reviewLinks() !== null"><app-icon name="users" [size]="16" /> Client approval</button>
           <button type="button" class="btn" (click)="duplicate()" [disabled]="busy()"><app-icon name="copy" [size]="16" /> Duplicate</button>
           <button type="button" class="btn danger-ghost" (click)="remove()" [disabled]="busy()"><app-icon name="trash" [size]="16" /> Delete</button>
           @if (editable()) {
@@ -59,6 +60,38 @@
           }
         </div>
       </div>
+    }
+
+    @if (reviewLinks(); as links) {
+      <section class="card stack-sm" style="margin-bottom: 16px" aria-label="Client approval links">
+        <div>
+          <strong>Client approval</strong>
+          <p class="muted small">Send a link to someone without an account. They see each channel's version and approve it or ask for changes; asking for changes takes it off the schedule.</p>
+        </div>
+        @for (l of links; track l.id) {
+          <div class="row-wrap">
+            <span class="small grow">{{ l.label || 'Link' }}</span>
+            @if (l.active) {
+              <code class="mono small truncate link-code">{{ l.url }}</code>
+              <button type="button" class="btn sm" (click)="copyLink(l.url)"><app-icon name="copy" [size]="14" /> Copy</button>
+              <span class="tiny muted">until {{ l.expires_at | tzDate: 'date' }}</span>
+              <button type="button" class="btn sm danger-ghost" (click)="revokeLink(l.id)">Withdraw</button>
+            } @else {
+              <span class="tiny muted">{{ l.revoked ? 'Withdrawn' : 'Expired' }}</span>
+            }
+          </div>
+        }
+        <form class="row-wrap" (ngSubmit)="createLink()">
+          <input class="input sm grow" name="label" [(ngModel)]="linkLabel" placeholder="Who it's for, e.g. Acme marketing" aria-label="Who the link is for" />
+          <select class="select sm" name="days" [(ngModel)]="linkDays" aria-label="Valid for">
+            <option [ngValue]="3">3 days</option>
+            <option [ngValue]="7">7 days</option>
+            <option [ngValue]="14">14 days</option>
+            <option [ngValue]="30">30 days</option>
+          </select>
+          <button type="submit" class="btn sm primary"><app-icon name="link" [size]="14" /> Create link</button>
+        </form>
+      </section>
     }
 
     @if (showApproval()) {

@@ -159,3 +159,10 @@
   gap: 6px;
   margin: 6px 0;
 }
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.link-code {
+  max-width: min(420px, 100%);
+}

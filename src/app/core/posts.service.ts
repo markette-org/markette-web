@@ -2,24 +2,7 @@ import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService, Query } from './api.service';
-import {
-  AdaptResponse,
-  ApprovedPost,
-  PostReview,
-  CalendarItem,
-  Id,
-  MediaAsset,
-  Paginated,
-  PlanPayload,
-  PlanResponse,
-  Post,
-  PostWrite,
-  SchedulePayload,
-  SuggestPayload,
-  SuggestResponse,
-  Target,
-  ValidationProblems,
-} from './models';
+import { AdaptResponse, ApprovedPost, CalendarItem, Id, MediaAsset, Paginated, PlanPayload, PlanResponse, Post, PostReview, PostWrite, ReviewLinkRow, SchedulePayload, SuggestPayload, SuggestResponse, Target, ValidationProblems } from './models';
 
 /** Typed calls for posts, targets, media, calendar and AI insights. */
 @Injectable({ providedIn: 'root' })
@@ -87,6 +70,15 @@ export class PostsService {
   }
   editRemote(id: Id, patch: { body?: string; title?: string }): Observable<Target> {
     return this.api.post<Target>(`targets/${id}/edit-remote/`, patch);
+  }
+  reviewLinks(postId: Id): Observable<ReviewLinkRow[]> {
+    return this.api.get<ReviewLinkRow[]>(`posts/${postId}/review-links/`);
+  }
+  createReviewLink(postId: Id, label: string, days: number): Observable<ReviewLinkRow[]> {
+    return this.api.post<ReviewLinkRow[]>(`posts/${postId}/review-links/`, { label, days });
+  }
+  revokeReviewLink(postId: Id, linkId: Id): Observable<ReviewLinkRow[]> {
+    return this.api.post<ReviewLinkRow[]>(`posts/${postId}/review-links/${linkId}/revoke/`);
   }
   continueThread(id: Id): Observable<Target> {
     return this.api.post<Target>(`targets/${id}/continue-thread/`);

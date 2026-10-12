@@ -29,6 +29,16 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/register.page').then((m) => m.RegisterPage),
   },
   {
+    path: 'review/:token',
+    title: 'Review · Markette',
+    loadComponent: () => import('./features/public/review.page').then((m) => m.ReviewPage),
+  },
+  {
+    path: 'report/:token',
+    title: 'Report · Markette',
+    loadComponent: () => import('./features/public/report.page').then((m) => m.SharedReportPage),
+  },
+  {
     path: '',
     canActivate: [serverGuard, authGuard],
     loadComponent: () => import('./features/shell/shell.component').then((m) => m.ShellComponent),

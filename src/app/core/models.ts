@@ -1118,3 +1118,30 @@ export interface TelegramChats {
   bot: string;
   chats: { id: number; title: string; type: string }[];
 }
+
+/* --- reports and review links ------------------------------------------------ */
+
+export interface SavedReport {
+  id: Id;
+  name: string;
+  period: '7d' | '30d' | 'previous_week' | 'previous_month';
+  frequency: '' | 'weekly' | 'monthly';
+  recipients: string[];
+  campaign: Id | null;
+  channels: Id[];
+  share_url: string | null;
+  last_sent_at: string | null;
+  last_error: string;
+  created_at: string;
+}
+
+export interface ReviewLinkRow {
+  id: Id;
+  label: string;
+  url: string;
+  created_at: string;
+  expires_at: string;
+  revoked: boolean;
+  active: boolean;
+  decisions: number;
+}

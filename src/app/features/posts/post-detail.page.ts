@@ -5,7 +5,8 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { CatalogService } from '../../core/catalog.service';
 import { formatError } from '../../core/errors';
-import { Id, Metrics, Post, Target, TargetAnalytics, ValidationProblems } from '../../core/models';
+import { Id, Metrics, Post, ReviewLinkRow, Target, TargetAnalytics, ValidationProblems } from '../../core/models';
+import { copyText } from '../platform/platform-utils';
 import { PostsService } from '../../core/posts.service';
 import { ToastService } from '../../core/toast.service';
 import { WorkspaceService } from '../../core/workspace.service';
@@ -338,6 +339,42 @@ export class PostDetailPage {
       },
       error: (err) => this.toast.error('Could not cancel', err),
     });
+  }
+
+  protected readonly reviewLinks = signal<ReviewLinkRow[] | null>(null);
+  protected linkLabel = '';
+  protected linkDays = 14;
+
+  protected toggleReviewLinks() {
+    const p = this.post();
+    if (!p) return;
+    if (this.reviewLinks() !== null) {
+      this.reviewLinks.set(null);
+      return;
+    }
+    this.posts.reviewLinks(p.id).subscribe({ next: (l) => this.reviewLinks.set(l), error: (err) => this.toast.error('Could not load links', err) });
+  }
+
+  protected createLink() {
+    const p = this.post();
+    if (!p) return;
+    this.posts.createReviewLink(p.id, this.linkLabel.trim(), this.linkDays).subscribe({
+      next: async (l) => {
+        this.reviewLinks.set(l);
+        this.linkLabel = '';
+        if (l[0] && (await copyText(l[0].url))) this.toast.success('Link created and copied');
+      },
+      error: (err) => this.toast.error('Could not create the link', err),
+    });
+  }
+
+  protected revokeLink(id: Id) {
+    const p = this.post();
+    if (p) this.posts.revokeReviewLink(p.id, id).subscribe({ next: (l) => this.reviewLinks.set(l), error: (err) => this.toast.error('Could not withdraw it', err) });
+  }
+
+  protected async copyLink(url: string) {
+    if (await copyText(url)) this.toast.success('Link copied');
   }
 
   protected readonly editing = signal<Target | null>(null);

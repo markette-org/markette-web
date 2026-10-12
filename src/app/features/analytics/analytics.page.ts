@@ -1,9 +1,11 @@
+import { HttpClient } from '@angular/common/http';
 import { MoreChannelsComponent } from '../../shared/components/more-channels.component';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
-import { ApiService } from '../../core/api.service';
+import { ApiService, toParams } from '../../core/api.service';
+import { ToastService } from '../../core/toast.service';
 import { CatalogService } from '../../core/catalog.service';
 import { formatError } from '../../core/errors';
 import { AnalyticsOverview, AudienceSeries } from '../../core/models';
@@ -42,6 +44,19 @@ const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
           <div class="eyebrow">Performance</div>
           <h1>Analytics</h1>
           <p class="subtitle">Publications in the period, with their latest metrics. Dates in {{ ws.timezone() }}.</p>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn" (click)="exportCsv()" [disabled]="exporting()">
+            @if (exporting()) {
+              <span class="spinner"></span>
+            } @else {
+              <app-icon name="upload" [size]="16" />
+            }
+            Export CSV
+          </button>
+          @if (ws.isAdmin()) {
+            <a class="btn ghost" routerLink="/settings" fragment="reports"><app-icon name="send" [size]="16" /> Scheduled reports</a>
+          }
         </div>
       </header>
 
@@ -306,6 +321,29 @@ export class AnalyticsPage implements OnInit {
   protected readonly ws = inject(WorkspaceService);
   protected readonly catalog = inject(CatalogService);
   private readonly api = inject(ApiService);
+  private readonly http = inject(HttpClient);
+  private readonly toast = inject(ToastService);
+  protected readonly exporting = signal(false);
+
+  /** Downloads every publication of the period (with the current filters) as CSV. */
+  protected exportCsv() {
+    this.exporting.set(true);
+    const params = toParams({ from: this.from(), to: this.to(), channels: this.selected(), campaign: this.campaign() });
+    this.http.get(this.api.url('analytics/export/'), { params, responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        this.exporting.set(false);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `markette-${this.from()}-${this.to()}.csv`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      },
+      error: () => {
+        this.exporting.set(false);
+        this.toast.error('Export failed');
+      },
+    });
+  }
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
