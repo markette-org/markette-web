@@ -288,6 +288,34 @@
               <div class="notice danger small" role="alert"><app-icon name="alert" [size]="16" /><span class="pre-wrap">{{ t.last_error }}</span></div>
             }
           }
+          @if (t.status === 'handoff' && handoff(t); as h) {
+            <div class="check" role="group" [attr.aria-label]="'Upload on ' + h.site">
+              <p class="small"><strong>Ready to upload on {{ h.site }}.</strong> Everything is prepared below. Upload it on the site, then paste the new post's address.</p>
+              @for (m of h.media; track m.url) {
+                <a class="btn sm" [href]="m.url" target="_blank" rel="noopener" download><app-icon name="upload" [size]="14" /> {{ m.filename || 'File' }}</a>
+              }
+              @if (h.title) {
+                <div class="row-wrap"><span class="small grow"><span class="muted">Title</span> {{ h.title }}</span><button type="button" class="btn sm ghost" (click)="copyLink(h.title)"><app-icon name="copy" [size]="14" /> Copy</button></div>
+              }
+              @if (h.description) {
+                <div class="row-wrap"><span class="small grow pre-wrap"><span class="muted">Description</span> {{ h.description }}</span><button type="button" class="btn sm ghost" (click)="copyLink(h.description)"><app-icon name="copy" [size]="14" /> Copy</button></div>
+              }
+              @if (h.tags.length) {
+                <div class="row-wrap"><span class="small grow"><span class="muted">Tags</span> {{ h.tags.join(', ') }}</span><button type="button" class="btn sm ghost" (click)="copyLink(h.tags.join(', '))"><app-icon name="copy" [size]="14" /> Copy</button></div>
+              }
+              @if (ws.canWrite()) {
+                <a class="btn sm" [href]="h.upload_url" target="_blank" rel="noopener"><app-icon name="external" [size]="14" /> Open the upload page</a>
+                <label class="small" [for]="'up-' + t.id">Address of the new post</label>
+                <input #uploaded class="input" type="url" [id]="'up-' + t.id" placeholder="https://…" />
+                <div class="row-wrap">
+                  <button type="button" class="btn sm primary" (click)="resolveTarget(t, true, uploaded.value)" [disabled]="resolving() === t.id">
+                    <app-icon name="check" [size]="14" /> Uploaded
+                  </button>
+                  <button type="button" class="btn sm ghost" (click)="resolveTarget(t, false)" [disabled]="resolving() === t.id">Not uploading it</button>
+                </div>
+              }
+            </div>
+          }
           @if (t.status === 'unconfirmed' && ws.canWrite()) {
             <div class="check" role="group" [attr.aria-label]="'Check the ' + t.channel_detail.name + ' publication'">
               <p class="small">

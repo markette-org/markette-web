@@ -222,7 +222,7 @@ export class PostDetailPage {
   }
 
   protected canCancel(t: Target): boolean {
-    return this.ws.canWrite() && ['draft', 'scheduled', 'failed', 'unconfirmed'].includes(t.status);
+    return this.ws.canWrite() && ['draft', 'scheduled', 'failed', 'unconfirmed', 'handoff'].includes(t.status);
   }
 
   protected canDeleteRemote(t: Target): boolean {
@@ -238,7 +238,7 @@ export class PostDetailPage {
 
   /** "Published, but the first comment could not be posted: …" is a warning, not a failure. */
   protected isSoftError(t: Target): boolean {
-    return t.status === 'unconfirmed' || /^(Published, but|Marked as published|Waiting for)/i.test(t.last_error ?? '');
+    return t.status === 'unconfirmed' || t.status === 'handoff' || /^(Published, but|Marked as published|Uploaded by hand|Waiting for)/i.test(t.last_error ?? '');
   }
 
   /* --- post actions ---------------------------------------------------------- */
@@ -415,6 +415,10 @@ export class PostDetailPage {
     });
   }
 
+  protected handoff(t: Target): { site: string; upload_url: string; title: string; description: string; tags: string[]; media: { url: string; filename: string }[] } | null {
+    return ((t.extra as Record<string, unknown> | null)?.['handoff'] as ReturnType<PostDetailPage['handoff']>) ?? null;
+  }
+
   protected thread(t: Target): { posted: number; total: number } | null {
     const th = (t.extra as { thread?: { total: number; posts: unknown[] } } | null)?.thread;
     return th ? { posted: th.posts.length, total: th.total } : null;
@@ -443,7 +447,7 @@ export class PostDetailPage {
       next: (res) => {
         this.resolving.set(null);
         this.patchTarget(res);
-        this.toast.success(published ? 'Marked as published' : 'Publishing it again');
+        this.toast.success(published ? 'Marked as published' : t.status === 'handoff' ? 'Not uploading it' : 'Publishing it again');
         this.reloadQuietly();
       },
       error: (err) => {

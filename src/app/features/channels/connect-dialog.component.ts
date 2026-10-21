@@ -5,6 +5,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, ou
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/api.service';
+import { WorkspaceService } from '../../core/workspace.service';
 import { CatalogService } from '../../core/catalog.service';
 import { formatError } from '../../core/errors';
 import { Channel, ConnectStartResponse, CredentialField, Provider } from '../../core/models';
@@ -117,6 +118,24 @@ type CredValue = string | boolean;
                     for a private channel, add the app to it first.
                   </span>
                 </div>
+              }
+              @case ('pornhub') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('youporn') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('redtube') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('xhamster') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('onlyfans') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('fansly') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
               }
               @case ('devto') {
                 <div class="notice accent small">
@@ -254,6 +273,17 @@ type CredValue = string | boolean;
         }
       </div>
     </app-modal>
+    <ng-template #handoffNote>
+      <div class="notice accent small">
+        <app-icon name="info" [size]="16" />
+        <span>
+          This site has no upload API. At the scheduled time Markette prepares everything (video, title, description, tags), notifies you,
+          and you upload it on the site and paste the new post's address back. Optionally, paste a session (cookies exported from your
+          browser while signed in) to let the <strong>upload bot</strong> do it, if this server runs it; whatever it cannot finish comes back
+          to you. Automating uploads can break the site's terms.
+        </span>
+      </div>
+    </ng-template>
     <ng-template #newsletterNote>
       <div class="notice accent small">
         <app-icon name="info" [size]="16" />
@@ -355,6 +385,7 @@ export class ConnectDialogComponent {
 
   private api = inject(ApiService);
   private catalog = inject(CatalogService);
+  private readonly ws = inject(WorkspaceService);
   private toast = inject(ToastService);
   private router = inject(Router);
 
@@ -380,12 +411,14 @@ export class ConnectDialogComponent {
       const i = PROVIDER_ORDER.indexOf(p.key);
       return i === -1 ? 99 : i;
     };
-    const all = [...this.catalog.providers()].sort((a, b) => order(a) - order(b));
+    const adult = !!this.ws.active()?.adult_content;
+    const all = [...this.catalog.providers()].filter((p) => adult || !p.adult).sort((a, b) => order(a) - order(b));
     return [
-      { title: 'Social', items: all.filter((p) => p.key !== 'webhook' && p.kind !== 'blog' && p.kind !== 'newsletter') },
+      { title: 'Social', items: all.filter((p) => !p.adult && p.key !== 'webhook' && p.kind !== 'blog' && p.kind !== 'newsletter') },
       { title: 'Blogs & sites', items: all.filter((p) => p.key !== 'webhook' && p.kind === 'blog') },
       { title: 'Newsletters', items: all.filter((p) => p.key !== 'webhook' && p.kind === 'newsletter') },
       { title: 'Integrations', items: all.filter((p) => p.key === 'webhook') },
+      { title: 'Adult', items: all.filter((p) => p.adult) },
     ].filter((g) => g.items.length);
   });
 

@@ -470,7 +470,7 @@ export class DashboardPage implements OnInit {
 
     const empty = { count: 0, next: null, previous: null, results: [] as Post[] };
     forkJoin([
-      this.posts.list({ status: 'failed,partial,unconfirmed', limit: 8, ordering: '-updated_at' }).pipe(catchError(() => of(empty))),
+      this.posts.list({ status: 'failed,partial,unconfirmed,handoff', limit: 8, ordering: '-updated_at' }).pipe(catchError(() => of(empty))),
       this.posts.list({ limit: 1 }).pipe(catchError(() => of(empty))),
       this.posts.list({ review: 'mine', limit: 5, ordering: '-updated_at' }).pipe(catchError(() => of(empty))),
     ]).subscribe(([failing, any, review]) => {
@@ -487,7 +487,7 @@ export class DashboardPage implements OnInit {
   }
 
   protected failedTargets(p: Post) {
-    return p.targets.filter((t) => t.status === 'failed' || t.status === 'unconfirmed');
+    return p.targets.filter((t) => t.status === 'failed' || t.status === 'unconfirmed' || t.status === 'handoff');
   }
 
   protected hasFailed(p: Post): boolean {
@@ -501,7 +501,7 @@ export class DashboardPage implements OnInit {
         this.retrying.set(null);
         this.toast.success('Retry queued', 'Failed publications will be sent again shortly.');
         this.attention.update((list) =>
-          updated.status === 'failed' || updated.status === 'partial' || updated.status === 'unconfirmed'
+          updated.status === 'failed' || updated.status === 'partial' || updated.status === 'unconfirmed' || updated.status === 'handoff'
             ? list.map((x) => (x.id === updated.id ? updated : x))
             : list.filter((x) => x.id !== updated.id),
         );

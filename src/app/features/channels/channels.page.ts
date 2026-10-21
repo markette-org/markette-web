@@ -18,6 +18,7 @@ import { RelativeTimePipe, TzDatePipe } from '../../shared/pipes/tz-date.pipe';
 import { channelColor, providerMeta } from '../../shared/utils/providers';
 import { ConnectDialogComponent } from './connect-dialog.component';
 import { SubscribersDrawerComponent } from './subscribers-drawer.component';
+import { UploadBotPanelComponent } from './upload-bot-panel.component';
 import { WebhookSetupComponent } from './webhook-setup.component';
 import { AddSubredditDialogComponent } from './add-subreddit-dialog.component';
 
@@ -51,8 +52,7 @@ const YOUTUBE_CATEGORIES: Record<string, string> = {
     TzDatePipe,
     RelativeTimePipe,
     WebhookSetupComponent,
-    NgTemplateOutlet,
-  ],
+    NgTemplateOutlet, UploadBotPanelComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page">
@@ -327,6 +327,13 @@ const YOUTUBE_CATEGORIES: Record<string, string> = {
                   <app-icon name="alert" [size]="16" />
                   <span class="small">{{ ch.last_error || 'Access to this account was revoked or expired.' }}</span>
                 </div>
+              }
+
+              @if (ws.isAdmin() && catalog.provider(ch.provider)?.handoff) {
+                <details class="bot-details">
+                  <summary class="small">How posts are uploaded</summary>
+                  <app-upload-bot-panel [channel]="ch" />
+                </details>
               }
 
               <div class="ch-actions">

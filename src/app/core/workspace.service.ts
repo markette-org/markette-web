@@ -148,7 +148,7 @@ export class WorkspaceService {
     );
   }
 
-  update(id: number, patch: Partial<Workspace> & { archived?: boolean }): Observable<Workspace> {
+  update(id: number, patch: Partial<Workspace> & { archived?: boolean; adult_confirmation?: boolean }): Observable<Workspace> {
     return this.api.patch<Workspace>(`workspaces/${id}/`, patch).pipe(
       tap((ws) => {
         this.workspaces.update((list) => list.map((w) => (w.id === ws.id ? { ...w, ...ws, role: ws.role ?? w.role } : w)));

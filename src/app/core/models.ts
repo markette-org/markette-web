@@ -48,6 +48,9 @@ export interface Workspace {
   ai_available?: boolean;
   /** UTM tags and short links on social posts. */
   link_tracking?: LinkTracking;
+  /** Adult platforms (Pornhub, OnlyFans…) are offered; turned on by an admin with a confirmation. */
+  adult_content?: boolean;
+  adult_confirmed_at?: string | null;
   role: Role | null;
   organization?: Id;
   organization_name?: string;
@@ -178,7 +181,7 @@ export type ProviderKey =
   | 'hugo';
 
 /** 'newsletter' = email lists (Brevo, Listmonk); the webhook integration reports 'social'. */
-export type ProviderKind = 'social' | 'blog' | 'newsletter';
+export type ProviderKind = 'social' | 'blog' | 'newsletter' | 'video';
 
 export type CountMode = 'chars' | 'graphemes' | 'x' | 'mastodon';
 
@@ -220,6 +223,10 @@ export interface Provider {
   inbox_reply?: boolean;
   /** Past posts can be imported. */
   history?: boolean;
+  /** Adult platform: only offered when the workspace turned adult content on. */
+  adult?: boolean;
+  /** No upload API: Markette prepares the upload and a person (or the upload bot) finishes it. */
+  handoff?: boolean;
   credential_fields: CredentialField[];
 }
 
@@ -351,7 +358,7 @@ export interface Slot {
 
 /* --- Posts ------------------------------------------------------------------ */
 
-export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'unconfirmed' | 'failed';
+export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'unconfirmed' | 'handoff' | 'failed';
 export type TargetStatus =
   | 'draft'
   | 'scheduled'
@@ -360,6 +367,8 @@ export type TargetStatus =
   | 'published'
   // The network may have published it but its answer was lost: a person checks.
   | 'unconfirmed'
+  // Ready to upload by hand (sites without an upload API).
+  | 'handoff'
   | 'failed'
   | 'cancelled';
 export type ScheduleMode = 'now' | 'exact' | 'queue' | 'best_time';

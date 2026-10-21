@@ -65,6 +65,30 @@ import { allTimezones } from '../../shared/utils/dates';
         </div>
 
         <fieldset class="stack-sm tracking">
+          <legend><strong>Adult platforms</strong> <span class="muted small">— Pornhub, YouPorn, RedTube, xHamster, OnlyFans, Fansly</span></legend>
+          <label class="switch">
+            <input type="checkbox" name="adult" [(ngModel)]="adult" [disabled]="!ws.isAdmin()" />
+            <span class="track"></span>
+            <span>Offer adult platforms in this workspace. They are hidden everywhere else.</span>
+          </label>
+          @if (adult() && !w.adult_content) {
+            <label class="check-row small">
+              <input type="checkbox" name="adultConfirm" [(ngModel)]="adultConfirm" />
+              <span>
+                I confirm that every person depicted is 18 or older and agreed to the publication, that the accounts used belong to the
+                performers who authorized us to post for them, and that the records each platform requires (age and consent verification)
+                are kept.
+              </span>
+            </label>
+          } @else if (w.adult_content && w.adult_confirmed_at) {
+            <span class="hint">Turned on {{ w.adult_confirmed_at.slice(0, 10) }}.</span>
+          }
+          @if (fe()['adult_confirmation']) {
+            <span class="error">{{ fe()['adult_confirmation'] }}</span>
+          }
+        </fieldset>
+
+        <fieldset class="stack-sm tracking">
           <legend><strong>Link tracking</strong> <span class="muted small">— on social posts only; blogs and newsletters keep clean links</span></legend>
           <label class="switch">
             <input type="checkbox" name="utm" [(ngModel)]="utm" [disabled]="!ws.isAdmin()" />
@@ -123,6 +147,11 @@ import { allTimezones } from '../../shared/utils/dates';
       padding: 0;
       margin: 8px 0 0;
     }
+    .check-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
     .tracking legend {
       margin-bottom: 6px;
     }
@@ -148,6 +177,8 @@ export class WorkspaceSectionComponent {
   protected readonly timezone = signal('UTC');
   protected readonly gap = signal(0);
   protected readonly ai = signal(false);
+  protected readonly adult = signal(false);
+  protected readonly adultConfirm = signal(false);
   protected readonly utm = signal(false);
   protected readonly shortLinks = signal(false);
   protected readonly utmMedium = signal('social');
@@ -164,6 +195,8 @@ export class WorkspaceSectionComponent {
       this.timezone.set(w.timezone);
       this.gap.set(w.min_gap_minutes);
       this.ai.set(w.ai_enabled);
+      this.adult.set(!!w.adult_content);
+      this.adultConfirm.set(false);
       const lt = w.link_tracking ?? {};
       this.utm.set(!!lt.utm);
       this.shortLinks.set(!!lt.short_links);
@@ -184,6 +217,8 @@ export class WorkspaceSectionComponent {
         timezone: this.timezone(),
         min_gap_minutes: Number(this.gap()) || 0,
         ai_enabled: this.ai(),
+        adult_content: this.adult(),
+        ...(this.adult() && !w.adult_content ? { adult_confirmation: this.adultConfirm() } : {}),
         link_tracking: {
           utm: this.utm(),
           short_links: this.shortLinks(),

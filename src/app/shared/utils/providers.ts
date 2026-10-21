@@ -34,6 +34,12 @@ export const PROVIDER_META: Record<string, ProviderMeta> = {
   devto: { label: 'DEV', color: '#0A0A0A', ink: '#ffffff', mark: 'DEV', kind: 'blog' },
   medium: { label: 'Medium', color: '#000000', ink: '#ffffff', mark: 'M', kind: 'blog' },
   hugo: { label: 'Hugo', color: '#ff4088', ink: '#ffffff', mark: 'H', kind: 'blog' },
+  pornhub: { label: 'Pornhub', color: '#000000', ink: '#ff9000', mark: 'PH', kind: 'video' },
+  youporn: { label: 'YouPorn', color: '#ff0f6f', ink: '#ffffff', mark: 'YP', kind: 'video' },
+  redtube: { label: 'RedTube', color: '#a3001d', ink: '#ffffff', mark: 'RT', kind: 'video' },
+  xhamster: { label: 'xHamster', color: '#e34449', ink: '#ffffff', mark: 'xH', kind: 'video' },
+  onlyfans: { label: 'OnlyFans', color: '#00aff0', ink: '#ffffff', mark: 'OF', kind: 'social' },
+  fansly: { label: 'Fansly', color: '#2699f7', ink: '#ffffff', mark: 'Fy', kind: 'social' },
 };
 
 export function providerMeta(key: string | null | undefined): ProviderMeta {
@@ -80,4 +86,10 @@ export const PROVIDER_ORDER = [
   'brevo',
   'listmonk',
   'webhook',
+  'pornhub',
+  'youporn',
+  'redtube',
+  'xhamster',
+  'onlyfans',
+  'fansly',
 ];
