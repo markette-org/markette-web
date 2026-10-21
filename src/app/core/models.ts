@@ -1169,7 +1169,7 @@ export interface InboxItem {
   channel: Id;
   channel_name: string;
   provider: string;
-  kind: 'reply' | 'mention' | 'comment' | 'quote';
+  kind: 'reply' | 'mention' | 'comment' | 'quote' | 'message';
   text: string;
   url: string;
   author_name: string;

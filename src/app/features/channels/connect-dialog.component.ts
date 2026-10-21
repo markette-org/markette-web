@@ -137,6 +137,17 @@ type CredValue = string | boolean;
               @case ('fansly') {
                 <ng-container [ngTemplateOutlet]="handoffNote" />
               }
+              @case ('telegram_user') {
+                <div class="notice accent small">
+                  <app-icon name="info" [size]="16" />
+                  <span>
+                    Publishes as <strong>you</strong> (not a bot) to your channels, groups and chats, and brings your <strong>direct messages</strong>
+                    into the inbox so you can answer them. Get an API ID and hash at <strong>my.telegram.org → API development tools</strong>, enter
+                    your number, then the code Telegram sends you. Anyone with this session can act as your account: connect only accounts you
+                    are allowed to manage.
+                  </span>
+                </div>
+              }
               @case ('devto') {
                 <div class="notice accent small">
                   <app-icon name="info" [size]="16" />
@@ -234,6 +245,19 @@ type CredValue = string | boolean;
                 }
               }
             }
+            @if (p.key === 'telegram_user' && tgRequest()) {
+              <div class="field">
+                <label for="tg-code">Login code</label>
+                <input id="tg-code" name="tgcode" class="input mono" [(ngModel)]="tgCode" inputmode="numeric" autocomplete="one-time-code" />
+                <span class="hint">Telegram sent it to your Telegram app (or by SMS).</span>
+              </div>
+              @if (tgNeedsPassword()) {
+                <div class="field">
+                  <label for="tg-pass">Two-step verification password</label>
+                  <input id="tg-pass" name="tgpass" class="input" type="password" [(ngModel)]="tgPassword" autocomplete="current-password" />
+                </div>
+              }
+            }
             <p class="muted tiny"><app-icon name="lock" [size]="12" /> Credentials are encrypted at rest and only used to publish on your behalf.</p>
           }
           @if (qqHelp(); as q) {
@@ -268,7 +292,15 @@ type CredValue = string | boolean;
             @if (busy()) {
               <span class="spinner"></span>
             }
-            {{ selected()!.auth === 'oauth2' ? 'Continue to ' + selected()!.label : 'Connect' }}
+            {{
+              selected()!.auth === 'oauth2'
+                ? 'Continue to ' + selected()!.label
+                : selected()!.key === 'telegram_user'
+                  ? tgRequest()
+                    ? 'Sign in'
+                    : 'Send the code'
+                  : 'Connect'
+            }}
           </button>
         }
       </div>
@@ -494,6 +526,14 @@ export class ConnectDialogComponent {
     this.selected.set(null);
     this.error.set('');
     this.qqHelp.set(null);
+    this.resetTelegram();
+  }
+
+  private resetTelegram() {
+    this.tgRequest.set(null);
+    this.tgNeedsPassword.set(false);
+    this.tgCode = '';
+    this.tgPassword = '';
   }
 
   protected str(name: string): string {
@@ -507,8 +547,50 @@ export class ConnectDialogComponent {
 
   protected close() {
     if (this.busy()) return;
+    this.resetTelegram();
     this.selected.set(null);
     this.closed.emit();
+  }
+
+  protected readonly tgRequest = signal<string | null>(null);
+  protected readonly tgNeedsPassword = signal(false);
+  protected tgCode = '';
+  protected tgPassword = '';
+
+  /** Telegram personal account: send the code, then sign in (with the 2FA password if asked), then pick chats. */
+  private telegramLogin() {
+    const v = this.values();
+    const req = this.tgRequest();
+    const body = req
+      ? { step: 'code', request_id: req, code: this.tgCode.trim(), password: this.tgPassword }
+      : { step: 'start', api_id: String(v['api_id'] ?? '').trim(), api_hash: String(v['api_hash'] ?? '').trim(), phone: String(v['phone'] ?? '').trim() };
+    this.busy.set(true);
+    this.api.post<{ request_id: string; sent?: boolean; count?: number }>('channels/telegram-login/', body).subscribe({
+      next: (res) => {
+        this.busy.set(false);
+        if (!req) {
+          this.tgRequest.set(res.request_id);
+          return;
+        }
+        this.tgRequest.set(null);
+        this.tgNeedsPassword.set(false);
+        this.selected.set(null);
+        this.closed.emit();
+        this.router.navigate(['/channels/connect', res.request_id]);
+      },
+      error: (err) => {
+        this.busy.set(false);
+        const e = (err as { error?: { needs?: string } })?.error;
+        if (e?.needs === 'password') {
+          this.tgNeedsPassword.set(true);
+          if (!this.tgPassword) {
+            this.error.set('This account has a two-step verification password: enter it.');
+            return;
+          }
+        }
+        this.error.set(formatError(err));
+      },
+    });
   }
 
   protected submit() {
@@ -516,6 +598,10 @@ export class ConnectDialogComponent {
     if (!p || this.busy()) return;
     this.error.set('');
     this.qqHelp.set(null);
+    if (p.key === 'telegram_user') {
+      this.telegramLogin();
+      return;
+    }
     if (p.auth === 'oauth2') {
       const body: Record<string, string> = { provider: p.key };
       if (p.instance_url) {

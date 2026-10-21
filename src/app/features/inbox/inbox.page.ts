@@ -14,7 +14,13 @@ import { RelativeTimePipe } from '../../shared/pipes/tz-date.pipe';
 
 type Filter = 'open' | 'new' | 'done' | 'all';
 
-const KIND_LABEL: Record<string, string> = { reply: 'replied', mention: 'mentioned you', comment: 'commented', quote: 'quoted you' };
+const KIND_LABEL: Record<string, string> = {
+  reply: 'replied',
+  mention: 'mentioned you',
+  comment: 'commented',
+  quote: 'quoted you',
+  message: 'wrote to you',
+};
 
 @Component({
   selector: 'app-inbox-page',
