@@ -408,6 +408,10 @@ export interface TargetOptions {
   thread_numbering?: boolean;
   /** Add "Discuss this post on …" links to this publication once its announcements are live. */
   backlinks?: boolean;
+  // Fanvue, clip stores, fan sites
+  audience?: 'subscribers' | 'followers-and-subscribers';
+  /** Price as typed (e.g. "9.99"). */
+  price?: string;
   // first comment (LinkedIn, Facebook, Instagram)
   first_comment?: string;
   /** undefined = channel default (config.links_in_first_comment) */

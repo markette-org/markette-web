@@ -41,6 +41,13 @@ export const PROVIDER_META: Record<string, ProviderMeta> = {
   xhamster: { label: 'xHamster', color: '#e34449', ink: '#ffffff', mark: 'xH', kind: 'video' },
   onlyfans: { label: 'OnlyFans', color: '#00aff0', ink: '#ffffff', mark: 'OF', kind: 'social' },
   fansly: { label: 'Fansly', color: '#2699f7', ink: '#ffffff', mark: 'Fy', kind: 'social' },
+  fanvue: { label: 'Fanvue', color: '#13B37A', ink: '#ffffff', mark: 'Fv', kind: 'social' },
+  xvideos: { label: 'XVideos', color: '#de2600', ink: '#ffffff', mark: 'XV', kind: 'video' },
+  xnxx: { label: 'XNXX', color: '#1a1aff', ink: '#ffffff', mark: 'XN', kind: 'video' },
+  spankbang: { label: 'SpankBang', color: '#f8a017', ink: '#000000', mark: 'SB', kind: 'video' },
+  eporner: { label: 'Eporner', color: '#2f2f2f', ink: '#ffcc00', mark: 'EP', kind: 'video' },
+  manyvids: { label: 'ManyVids', color: '#ff2a6d', ink: '#ffffff', mark: 'MV', kind: 'video' },
+  clips4sale: { label: 'Clips4Sale', color: '#7a1fa2', ink: '#ffffff', mark: 'C4S', kind: 'video' },
 };
 
 export function providerMeta(key: string | null | undefined): ProviderMeta {
@@ -94,4 +101,11 @@ export const PROVIDER_ORDER = [
   'xhamster',
   'onlyfans',
   'fansly',
+  'fanvue',
+  'manyvids',
+  'clips4sale',
+  'xvideos',
+  'xnxx',
+  'spankbang',
+  'eporner',
 ];

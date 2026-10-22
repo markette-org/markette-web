@@ -137,6 +137,24 @@ type CredValue = string | boolean;
               @case ('fansly') {
                 <ng-container [ngTemplateOutlet]="handoffNote" />
               }
+              @case ('xvideos') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('xnxx') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('spankbang') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('eporner') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('manyvids') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
+              @case ('clips4sale') {
+                <ng-container [ngTemplateOutlet]="handoffNote" />
+              }
               @case ('telegram_user') {
                 <div class="notice accent small">
                   <app-icon name="info" [size]="16" />

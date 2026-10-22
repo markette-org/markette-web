@@ -439,6 +439,35 @@
                     <span class="hint">Text over 2,000 characters is split into several messages (6,000 max); up to 10 attachments. Mentions such as &#64;everyone are disabled.</span>
                   </div>
                 </fieldset>
+              } @else if (s.channel.provider === 'fanvue') {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>Fanvue options</legend>
+                  <div class="form-grid">
+                    <div class="field">
+                      <label [for]="'aud-' + s.channel.id">Who sees it</label>
+                      <select class="select" [id]="'aud-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'audience') || 'subscribers'" (ngModelChange)="setOption(s.channel.id, 'audience', $event)">
+                        <option value="subscribers">Subscribers</option>
+                        <option value="followers-and-subscribers">Followers and subscribers</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label [for]="'price-' + s.channel.id">Price to unlock</label>
+                      <input class="input" type="number" min="3" step="0.01" [id]="'price-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'price')" (ngModelChange)="setOption(s.channel.id, 'price', $event === null ? '' : '' + $event)" placeholder="Free" />
+                      <span class="hint">Optional, from 3.00; needs media.</span>
+                    </div>
+                  </div>
+                </fieldset>
+              } @else if (s.channel.provider === 'manyvids' || s.channel.provider === 'clips4sale' || s.channel.provider === 'onlyfans' || s.channel.provider === 'fansly') {
+                <fieldset class="options" [disabled]="s.locked">
+                  <legend>{{ s.provider?.label }} options</legend>
+                  <div class="form-grid">
+                    <div class="field">
+                      <label [for]="'price-' + s.channel.id">Price</label>
+                      <input class="input" type="number" min="0" step="0.01" [id]="'price-' + s.channel.id" [ngModel]="optionString(s.channel.id, 'price')" (ngModelChange)="setOption(s.channel.id, 'price', $event === null ? '' : '' + $event)" placeholder="Free" />
+                      <span class="hint">Shown in the upload instructions (and typed in by the upload bot where the site has a price field).</span>
+                    </div>
+                  </div>
+                </fieldset>
               } @else if (s.channel.provider === 'mastodon') {
                 <fieldset class="options" [disabled]="s.locked">
                   <legend>Mastodon options</legend>

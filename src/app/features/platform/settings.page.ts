@@ -21,7 +21,7 @@ import { RelativeTimePipe, TzDatePipe } from '../../shared/pipes/tz-date.pipe';
 import { PlatformHeaderComponent } from './platform-header.component';
 import { copyText } from './platform-utils';
 
-type SectionKey = 'general' | 'announcement' | 'signups' | 'plan' | 'publishing' | 'ai' | 'x' | 'linkedin' | 'meta' | 'threads' | 'reddit' | 'slack' | 'youtube' | 'mastodon' | 'billing' | 'email';
+type SectionKey = 'general' | 'announcement' | 'signups' | 'plan' | 'publishing' | 'ai' | 'x' | 'linkedin' | 'meta' | 'threads' | 'reddit' | 'slack' | 'youtube' | 'mastodon' | 'fanvue' | 'billing' | 'email';
 type LimitKey = 'default_max_workspaces' | 'default_max_channels' | 'default_max_members' | 'default_ai_monthly_tokens';
 
 interface OverrideField {
@@ -99,6 +99,7 @@ const SECTION_OVERRIDES: Partial<Record<SectionKey, OverrideField[]>> = {
     },
   ],
   slack: [{ name: 'SLACK_CLIENT_ID', label: 'Client ID', kind: 'text', hint: 'api.slack.com/apps → your app → Basic Information → App Credentials.' }],
+  fanvue: [{ name: 'FANVUE_CLIENT_ID', label: 'Client ID', kind: 'text', hint: 'Fanvue → your app (only KYC-verified creators can create one) → credentials.' }],
   youtube: [{ name: 'GOOGLE_CLIENT_ID', label: 'OAuth client ID', kind: 'text', hint: 'Google Cloud → APIs & Services → Credentials → OAuth client (Web application).' }],
   mastodon: [{ name: 'MASTODON_APP_NAME', label: 'App name', kind: 'text', hint: 'Shown on Mastodon servers as the posting application.' }],
 };
@@ -111,6 +112,7 @@ const SECTION_SECRETS: Partial<Record<SectionKey, { name: string; label: string 
   threads: [{ name: 'THREADS_APP_SECRET', label: 'Threads app secret' }],
   reddit: [{ name: 'REDDIT_CLIENT_SECRET', label: 'Client secret' }],
   slack: [{ name: 'SLACK_CLIENT_SECRET', label: 'Client secret' }],
+  fanvue: [{ name: 'FANVUE_CLIENT_SECRET', label: 'Client secret' }],
   youtube: [{ name: 'GOOGLE_CLIENT_SECRET', label: 'OAuth client secret' }],
   email: [{ name: 'EMAIL_HOST_PASSWORD', label: 'SMTP password' }],
   billing: [
@@ -157,6 +159,13 @@ export const NETWORK_APPS: { key: SectionKey; provider: string; label: string; c
     label: 'Google (YouTube)',
     callback: 'youtube',
     note: 'Google Cloud: enable YouTube Data API v3, create an OAuth client (Web), request the YouTube API audit for public uploads.',
+  },
+  {
+    key: 'fanvue',
+    provider: 'fanvue',
+    label: 'Fanvue',
+    callback: 'fanvue',
+    note: 'Adult platform (offered only in workspaces with adult content on). Create an OAuth app in Fanvue with this redirect URI and the scopes openid, offline_access, offline, read:self, read:post, write:post, read:media, write:media.',
   },
   { key: 'mastodon', provider: 'mastodon', label: 'Mastodon', callback: '', note: 'The app registers itself on each Mastodon server automatically; only the app name is configurable.' },
 ];
@@ -253,7 +262,7 @@ export class PlatformSettingsPage implements OnInit {
     out.announcement = this.announcement() !== (d.announcement || '') || this.level() !== d.announcement_level;
     out.signups = this.signupsOpen() !== d.signups_open || this.orgCreationOpen() !== d.org_creation_open || this.domains().join(', ') !== this.splitDomains(d.signup_domains).join(', ');
     out.plan = LIMITS.some(({ key }) => this.limitValue(key) !== d[key]);
-    for (const key of ['publishing', 'ai', 'x', 'linkedin', 'meta', 'threads', 'reddit', 'slack', 'youtube', 'mastodon', 'billing', 'email'] as SectionKey[]) {
+    for (const key of ['publishing', 'ai', 'x', 'linkedin', 'meta', 'threads', 'reddit', 'slack', 'youtube', 'mastodon', 'fanvue', 'billing', 'email'] as SectionKey[]) {
       const fields = SECTION_OVERRIDES[key] ?? [];
       let changed = fields.some((f) => this.ovr()[f.name] !== overrideToDraft(d.overrides[f.name]?.value, f.kind));
       changed ||= (SECTION_SECRETS[key] ?? []).some((s) => !!this.secretDraft()[s.name]?.trim());
